@@ -5060,7 +5060,13 @@ Here's whats left:
 07.08.2024 Wednesday   8h 30m
 08.08.2024 Thursday    6h
 
-Total                 78h 15m
+09.08.2024 Friday         10m
+19.08.2024 Monday      6h
+20.08.2024 Tuesday     4h 20m
+21.08.2024 Wednesday   7h 30m
+22.08.2024 Thursday    4h
+
+Total                100h 15m
 ```
 
 #### 24.06.2024 Monday 1h
@@ -7162,6 +7168,314 @@ c4732fa36c0b5adf481a00a2f992
 
 So post batch 1 is just an int, and post batch type 2 is some kind of header data.  
 I'm seeing a whole new class of message types here (that I can totally ignore for now?).  
+
+#### 09.08.2024 Friday 10m
+
+Just got this message in right after a start batch:
+
+```
+8302820082820119029bd818590283851a2d964a095820f0f7892b5c333cffc4b3c4344de48af4cc63f55e44936196f365a9
+ef2244134f84830058200e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a85820afc0da64183b
+f2664f3d4eec7238d524ba607faeeab24fc100eb861dba69971b8300582025777aca9e4a73d48fc73b4f961d345b06d4a6f3
+49cb7916570d35537d53479f5820d36a2619a672494604e11bb447cbcf5231e9f2ba25c2169177edc941bd50ad6c5820afc0
+da64183bf2664f3d4eec7238d524ba607faeeab24fc100eb861dba69971b58204e66280cd94d591072349bec0a3090a53aa9
+45562efb6d08d56e53654b0e409884820001584050733161fdafb6c8cb6fae0e25bdf9555105b3678efb08f1775b9e90de4f
+5c77bcc8cefff8d9011cb278b28fddc86d9bab099656d77a7856c7619108cbf6575281028202828400584050733161fdafb6
+c8cb6fae0e25bdf9555105b3678efb08f1775b9e90de4f5c77bcc8cefff8d9011cb278b28fddc86d9bab099656d77a7856c7
+619108cbf657525840e8c03a03c0b2ddbea4195caf39f41e669f7d251ecf221fbb2f275c0a5d7e05d190dcc246f56c8e33ac
+0037066e2f664ddaa985ea5284082643308dde4f5bfedf5840c8b39f094dc00608acb2d20ff274cb3e0c022ccb0ce558ea7c
+1a2d3a32cd54b42cc30d32406bcfbb7f2f86d05d2032848be15b178e3ad776f8b1bc56a671400d5840923c7714af7fe4b127
+2fc042111ece6fd08f5f16298d62bae755c70c1e1605697cbaed500e196330f40813128250d9ede9c8557b33f48e8a5f32f7
+65929e4a0d8483000000826a63617264616e6f2d736c00a058204ba92aa320c60acc9ad7b9a64f2eda55c4d2ec28e604faf1
+86708b4f0c4e8edf82821a07d8f5dd58208c50e4601cafbc3923266235bad050138a91961900fd14d5debf9bb2314a27431a
+00a30268
+```
+
+```
+[
+  2, 
+  [
+    0,
+    [
+      [1, 667],
+      24(h'851A2D964A095820F0F7892B5C333CFFC4B3C4344DE48AF4CC63F55E44936196F365A9EF2244134F84830058200E5751C026E543B2E8AB2EB06099DAA1D1E5DF47778F7787FAAB45CDF12FE3A85820AFC0DA64183BF2664F3D4EEC7238D524BA607FAEEAB24FC100EB861DBA69971B8300582025777ACA9E4A73D48FC73B4F961D345B06D4A6F349CB7916570D35537D53479F5820D36A2619A672494604E11BB447CBCF5231E9F2BA25C2169177EDC941BD50AD6C5820AFC0DA64183BF2664F3D4EEC7238D524BA607FAEEAB24FC100EB861DBA69971B58204E66280CD94D591072349BEC0A3090A53AA945562EFB6D08D56E53654B0E409884820001584050733161FDAFB6C8CB6FAE0E25BDF9555105B3678EFB08F1775B9E90DE4F5C77BCC8CEFFF8D9011CB278B28FDDC86D9BAB099656D77A7856C7619108CBF6575281028202828400584050733161FDAFB6C8CB6FAE0E25BDF9555105B3678EFB08F1775B9E90DE4F5C77BCC8CEFFF8D9011CB278B28FDDC86D9BAB099656D77A7856C7619108CBF657525840E8C03A03C0B2DDBEA4195CAF39F41E669F7D251ECF221FBB2F275C0A5D7E05D190DCC246F56C8E33AC0037066E2F664DDAA985EA5284082643308DDE4F5BFEDF5840C8B39F094DC00608ACB2D20FF274CB3E0C022CCB0CE558EA7C1A2D3A32CD54B42CC30D32406BCFBB7F2F86D05D2032848BE15B178E3AD776F8B1BC56A671400D5840923C7714AF7FE4B1272FC042111ECE6FD08F5F16298D62BAE755C70C1E1605697CBAED500E196330F40813128250D9EDE9C8557B33F48E8A5F32F765929E4A0D8483000000826A63617264616E6F2D736C00A058204BA92AA320C60ACC9AD7B9A64F2EDA55C4D2EC28E604FAF186708B4F0C4E8EDF')
+    ]
+  ],
+  [
+    [131659229, h'8C50E4601CAFBC3923266235BAD050138A91961900FD14D5DEBF9BB2314A2743'],
+    10682984
+  ]
+]
+```
+
+This doesn't make sense in a block stream coming from mainnet on the latest
+
+
+#### 19.08.2024 Monday 6h
+
+Right, making sure the db is being written properly first...
+
+Tip not being saved on graceful shutdown?
+
+> 13:51:52 ERR cbor: cannot unmarshal negative integer into Go value of type []interface {} (-18035791023083570319 overflows Go's int64)
+
+- [x] txs
+- [x] points
+- [x] tip
+
+We're actually missing blocks when following the chain for some reason.
+
+Last tip is more like last point, because the rollbackwards message doesn't
+contain a block number. Do I rework this?
+
+The roll forward / backward logic was always just using the remote peer tip,
+so that's why blocks are being skipped.
+
+I'm having an issue with the callbacks. One goes on to send another request (I
+think it's fetch block range that's the culprit) this blocks the read
+stream because the cb hasn't returned, which then freezes everything because
+the fetch cannot complete.
+
+Finally realised how to hash the tx! It IS the header (not the body) so you
+can calculate the hash from the roll forward message.
+
+Message queue deadlocking is becoming a headache...
+
+Okay I actually think the roll forward logic might be there.
+
+Going to see if it can run for the last 10m...
+
+#### 20.08.2024 Tuesday 4h 20m
+
+- Replace `labstack/echo` with `gofiber/fiber`
+- Set client tip to continue from chunk reader last block
+
+> INF chunked blocks range from 7791699 to 9680372
+> FTL block not found
+> requested block: 9680372
+
+- Update chunk reader to use `Database` interface 
+- Http/rpc server hash its own client connection just for block fetch
+- Chunks can contain their own number, would simplify the chunk reader and cache
+
+- tip endpoint broken
+
+```
+SELECT * FROM chunks WHERE start <= 7791699 AND end >= 7791699;
+SELECT * FROM points WHERE number = 9680625;
+```
+
+This is good:
+
+> chunk index: 7791699 to 9680372
+> point index: 9680373 to 9681342
+> chunks overlap n2n recorded points, continuing from n2n tip
+
+These occasionally come up:
+
+> panic: runtime error: slice bounds out of range [-2:]
+
+The above comes up sometimes a message is received with a partial header.
+
+> ERR conn read error: read tcp 192.168.0.150:49383->103.73.64.137:3001: read: connection reset by peer
+
+No idea what's causing the above one. Everything was seeming quite solid and now
+that's coming up.
+
+```
+go run ./cli/rpc \
+  --rpchostport=0.0.0.0:3001 \
+  --nodedatapath=/Users/adc/Desktop/maya-cardano-network/mainnet/db \
+  --nodehostport=backbone.mainnet.cardanofoundation.org:3001 \
+  --nodeconfigpath=/Users/adc/Desktop/maya-cardano-network/mainnet/config/config.json \
+  --byronconfigpath=/Users/adc/Desktop/maya-cardano-network/mainnet/config/byron-genesis.json \
+  --shelleyconfigpath=/Users/adc/Desktop/maya-cardano-network/mainnet/config/shelley-genesis.json
+```
+
+#### 21.08.2024 Wednesday 7h 30m
+
+Attacking this rare yet critical slice bounds error. Definitely to do with the
+partial header logic.
+
+> panic: runtime error: slice bounds out of range [-2:]
+
+```
+9684652
+111240397
+a9e281b587a8cff66db1fda4b0fd044e23babde03905849cca9d99c96bf2e9f3
+```
+
+```
+9684661
+111240663
+b5ed69a4727206f5ecfa9a6a4103050e7ff39f58eb2f9b87697b6aa738d49155
+```
+
+```
+9684662
+DBG partial/lone header detected [396:402] 5edb41548003
+```
+
+Interesting, this is consistent.  
+Same issue on block 9684662.  
+But if I move the start point closer, it passes it without an issue.  
+
+Think I found the issue. I was always moving 8 bytes forward (the size of the
+header) when reading, even if there was already a few bytes spilling over from
+the previous message into the new header. So I was occcasionally jumping too far
+forward and missing some bytes.
+
+I don't love that the client can't handle 2 "fetch range"s at the same time. At
+the moment I'm just using 2 clients, one for normal chain following and one for
+the http/rpc "get block" endpoint (to fetch a range of one block)
+
+If no chunks have been loaded before, we really should be finding the first chunk
+by going backwards from the most recent one, to the first chunk we can't decode,
+then go forwards from that one.
+
+- Chunk cache doesn't release memory properly
+
+Occasional errors:
+
+> ERR failed to fetch block post roll forward: timeout waiting for range fetch to complete
+> github.com/alexdcox/cardano-go.(*Client).FetchRange
+
+> ERR conn read error: read tcp 192.168.0.101:60998->185.175.59.38:3001: read: connection reset by peer
+> github.com/alexdcox/cardano-go.(*Client).beginReadStream
+
+
+Just double checked the blocks can be requested in hex or cbor format over http
+and that the chunked blocks are loaded first, then node blocks.
+
+An exceptionally rare cbor decode error (first and only time I've seen this):
+
+> break stop code outside indefinite length item
+
+Coded a test to see if the hash/point is reliable for a block, running against
+all the point data I've collected so far from mainnet.
+
+- Can probably remove `WrappedBlock` after confidence in the hash/point funcs
+
+#### 22.08.2024 Thursday 4h
+
+Renaming `last` to `end` to avoid confusion with `prior`/`previous`.
+
+Having a situation on my privnet where the conway block cannot be found.  
+Fixed, now a privnet client can follow the chain as well as mainnet.  
+
+Just noticed the transaction signing need to be the 32 byte private key
+converted to cbor first and then dumped as hex (as opposed to just dumped as
+hex) - in order to be used in the `transaction sign` cli command. Not sure why
+they bother, as encoding hex to cbor just adds some additional bytes to the hex
+indicating that the rest of it is raw binary. i.e
+
+```
+hex:      349bbc484f6665bcb8144eec2b045a4e18f568e7069d74126a4b5c22faf4c0e0
+cbor: 5820349bbc484f6665bcb8144eec2b045a4e18f568e7069d74126a4b5c22faf4c0e0
+```
+
+Convention maybe? Who am I to complain.
+
+okay now we have all the data we need (hopefully) let's finally
+build/sign/broadcast a transaction...
+
+```
+from:         faucet signing key
+from key:     5820a5e4238b67ebb1108c52a01ac850bbce82c915d77bad94331892f3edf612883c
+from base16:  609783be7d3c54f11377966dfabc9284cd6c32fca1cd42ef0a4f1cc45b
+from bech:    addr_test1vztc80na8320zymhjekl40yjsnxkcvhu58x59mc2fuwvgkc332vxv
+from utxo:    8c78893911a35d7c52104c98e8497a14d7295b4d9bf7811fc1d4e9f449884284#0
+
+to:           my new address
+to key:       7e651a8cf84749fc169ae05dfcef9ccf1f98d04caf5e4163603cb3643b7e5922
+to key cbor:  58207e651a8cf84749fc169ae05dfcef9ccf1f98d04caf5e4163603cb3643b7e5922
+to base16     60ec6ad4e960869e7f267647b2b08c92de0891eb82f9ba8c7d9ef5857a
+to bech:      addr_test1vrkx448fvzrfulexwerm9vyvjt0q3y0tstum4rranm6c27sfkc2gy
+
+unwitnessed:  84a300818258208c78893911a35d7c52104c98e8497a14d7295b4d9bf7811fc1d4e9f44988428400018282581d60ec6ad4e960869e7f267647b2b08c92de0891eb82f9ba8c7d9ef5857a1a01c9c38082581d609783be7d3c54f11377966dfabc9284cd6c32fca1cd42ef0a4f1cc45b1b000000d18a61ddd7021a000286a9a0f5f6
+witnessed:    84a300818258208c78893911a35d7c52104c98e8497a14d7295b4d9bf7811fc1d4e9f44988428400018282581d60ec6ad4e960869e7f267647b2b08c92de0891eb82f9ba8c7d9ef5857a1a01c9c38082581d609783be7d3c54f11377966dfabc9284cd6c32fca1cd42ef0a4f1cc45b1b000000d18a61ddd7021a000286a9a10081825820ce13cd433cdcb3dfb00c04e216956aeb622dcd7f282b03304d9fc9de804723b2584021731cdb9156bf09a5963a9d3fb8367e3c0015cacfec9b0a2c18d80e26a386a3fb7ebd3778b456b3b5a5373806b000c544033dbd01d81a56023459617c48df07f5f6
+```
+
+Back to this:
+
+> Command failed: transaction submit Error: Error while submitting tx:
+> ShelleyTxValidationError ShelleyBasedEraBabbage
+> (ApplyTxError [
+>   UtxowFailure (
+>     AlonzoInBabbageUtxowPredFailure (
+>       ShelleyInAlonzoUtxowPredFailure (
+>         MissingVKeyWitnessesUTXOW (fromList [
+>           KeyHash \"9783be7d3c54f11377966dfabc9284cd6c32fca1cd42ef0a4f1cc45b\"]))))])
+
+Oh maybe I'm just using the wrong key?
+
+> Transaction successfully submitted.
+
+And again locally (no cli, which the bifrost will need)...
+
+- txin
+- address
+- change
+- key
+
+Back to the bifrost!!!
+
+Don't forget to run `./scripts/protocgen.sh` if some of the core structs like
+`Asset` are missing.
+
+Cosmos `sdk.NewUint` seems to be missing? Also `...Amount.Uint64()`.  
+How do I get these again?  
+
+> go: gitlab.com/mayachain/mayanode/x/mayachain/keeper imports
+>   github.com/cosmos/cosmos-sdk/simapp: github.com/cosmos/cosmos-sdk/simapp@v0.0.0-20240822134736-0aa9eeb533c2: parsing go.mod:
+>   module declares its path as: cosmossdk.io/simapp
+>           but was required as: github.com/cosmos/cosmos-sdk/simapp
+
+Merged develop back in.
+
+```
+go get -d -v ~/code/cardano-go
+```
+
+Doesn't work like that, just had to put this back in the `go.mod`:
+
+```
+require github.com/alexdcox/cardano-go v0.0.0
+replace github.com/alexdcox/cardano-go => /Users/adc/code/cardano-go
+```
+
+Right where are these cosmos funcs?  
+I think there's something up with my `protoc-gen-gocosmos`.  
+
+```
+rm /Users/adc/go/bin/protoc-gen-gocosmos
+go install github.com/regen-network/cosmos-proto/protoc-gen-gocosmos@latest
+```
+
+> go: github.com/regen-network/cosmos-proto/protoc-gen-gocosmos@latest (in github.com/regen-network/cosmos-proto@v0.3.1):
+>   The go.mod file for the module providing named packages contains one or
+>   more replace directives. It must not contain directives that would cause
+>   it to be interpreted differently than if it were the main module.
+
+```
+go install github.com/cosmos/gogoproto/protoc-gen-gogo@latest
+
+brew upgrade protobuf
+rm -rf ~/go/pkg/mod/cache
+rm -rf ~/go/pkg/mod/cosmossdk.io
+rm -rf ~/go/pkg/mod/github.com/cosmos
+```
+
+gitlab.com/mayachain/mayanode/cmd/mayanode/cmd
+
+```
+replace (
+  github.com/cosmos/cosmos-sdk/simapp => cosmossdk.io/simapp v0.53.0
+  github.com/cosmos/cosmos-sdk/store cosmossdk.io/store v1.1.0
+  github.com/cosmos/cosmos-sdk/x/evidence => cosmossdk.io/x/evidence v0.1.1
+  github.com/cosmos/cosmos-sdk/x/feegrant => cosmossdk.io/x/feegrant v0.1.1
+)
+```
 
 
 
