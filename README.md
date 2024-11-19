@@ -7484,11 +7484,27 @@ replace (
 ### Batch Three
 
 ```
-27.09.2024 Friday     4h
-07.10.2024 Monday     6h
-08.10.2024 Tuesday    6h
-09.10.2024 Wednesday  6h
-11.10.2024 Friday     3h
+27.09.2024 Friday      4h
+07.10.2024 Monday      6h
+08.10.2024 Tuesday     6h
+09.10.2024 Wednesday   6h
+11.10.2024 Friday      3h
+
+16.10.2024 Wednesday   3h
+17.10.2024 Thursday    6h
+18.10.2024 Friday      5h
+22.10.2024 Tuesday     5h
+24.10.2024 Thursday    6h
+28.10.2024 Monday      4h
+29.10.2024 Tuesday     2h
+04.11.2024 Monday      6h
+05.11.2024 Tuesday     6h
+06.11.2024 Wednesday   6h 30m
+07.11.2024 Thursday    3h
+15.11.2024 Friday      6h
+19.11.2024 Monday      6h
+
+Total                 89h 30m
 ```
 
 #### 27.09.2024 Friday 4h
@@ -7505,11 +7521,11 @@ Going to use the go library to:
 
 Okay I've put that script together, but am getting this:
 
-> Command failed: transaction submit
-> Error: Error while submitting tx:
->   ShelleyTxValidationError ShelleyBasedEraBabbage
->   (ApplyTxError [UtxowFailure (UtxoFailure (AlonzoInBabbageUtxoPredFailure
->   (ValueNotConservedUTxO (MaryValue (Coin 900000000000) (MultiAsset (fromList []))) (MaryValue (Coin 900000200000) (MultiAsset (fromList []))))))])\n"}
+> Command failed: transaction submit  
+> Error: Error while submitting tx:  
+>   ShelleyTxValidationError ShelleyBasedEraBabbage  
+>   (ApplyTxError [UtxowFailure (UtxoFailure (AlonzoInBabbageUtxoPredFailure  
+>   (ValueNotConservedUTxO (MaryValue (Coin 900000000000) (MultiAsset (fromList []))) (MaryValue (Coin 900000200000) (MultiAsset (fromList []))))))])\n"}  
 
 `ValueNotConservedUTxO` 
 
@@ -7522,12 +7538,12 @@ That was it.
 
 Now I get:
 
-> Command failed: transaction submit
-> Error: Failed to decode the ledger's CDDL serialisation format.
-> TextEnvelope error: /dev/fd/3: TextEnvelope type error:
-> Expected one of: TxSignedShelley, Tx AllegraEra, Tx MaryEra, Tx AlonzoEra, Tx BabbageEra, Tx ConwayEra
-> Actual: Witnessed Tx BabbageEra
-> TextEnvelopeCddl error: /dev/fd/3: TextEnvelopeCDDL CBOR decoding error: DecoderErrorDeserialiseFailure \"Shelley Tx\" (DeserialiseFailure 227 \"Failed to decode AuxiliaryData\")\n"}
+> Command failed: transaction submit  
+> Error: Failed to decode the ledger's CDDL serialisation format.  
+> TextEnvelope error: /dev/fd/3: TextEnvelope type error:  
+> Expected one of: TxSignedShelley, Tx AllegraEra, Tx MaryEra, Tx AlonzoEra, Tx BabbageEra, Tx ConwayEra  
+> Actual: Witnessed Tx BabbageEra  
+> TextEnvelopeCddl error: /dev/fd/3: TextEnvelopeCDDL CBOR decoding error: DecoderErrorDeserialiseFailure \"Shelley Tx\" (DeserialiseFailure 227 \"Failed to decode AuxiliaryData\")\n"}  
 
 That was when I tried to set the aux data to "hi hello".
 
@@ -7581,7 +7597,7 @@ roll forward: number: 10891514 | slot: 135922130 | hash: 8b376727c2ef882e89c3150
 
 CONTINUE: from `blockConway` and look into metadata
 
-FIX:
+FIX:  
 I'm actually seeing 2 values in the K/V `["Dexhunter Trade", "Partner TAPTOOLS"]`
 and my code only parsed the first one.
 
@@ -8147,7 +8163,7 @@ and it shows up straight away??
 
 Ah it only likes lower case.
 
-This is an interesting block:
+This is an interesting block:  
 https://beta.explorer.cardano.org/en/block/10938322
 
 Raw
@@ -8203,7 +8219,7 @@ What does a string do? `"testing"`
 
 > Failed to decode AuxiliaryData
 
-and this `{1: "testing"}`
+and this `{1: "testing"}`  
 it accepted that. and it looks like: `{0: {1: "testing"}}`
 
 and let me guess, if I send `{0: "testing"}` it will wrap it with the `{1: ...}`?
@@ -8318,8 +8334,8 @@ Maybe I've got that wrong.
 The node doesn't return the height of a utxo, maybe we should embellish that
 response as we seem to need it for `getUTXOs`.
 
-Well that's the first bifrost draft complete.
-If I add height to the utxo it should actually be usable.
+Well that's the first bifrost draft complete.  
+If I add height to the utxo it should actually be usable.  
 
 I just found the following returned in the `protocol-parameters` cli rpc response.
 ```
@@ -8358,5 +8374,2825 @@ ed25519/tss work for cardano and update some of my key/sign logic to use that.
 
 So far I've ONLY used tss, so that might be an issue when running the smoke tests
 with just a single node. Might have to take the split approach.
+
+#### 16.102024 Wednesday 3h
+
+Going to update my private network to conway first.
+
+Pulling/merging latest from develop branch and resolving conflicts
+
+DOGE, LTC and BCH and have been removed, that's what most of the conflicts
+revolved around.
+
+Running tests.
+
+```
+make test
+```
+
+Wow that was far from clean. Getting a load of warnings:
+
+```
+warning: 'kIOMasterPortDefault' is deprecated: first deprecated in macOS 12.0 [-Wdeprecated-declarations]
+warning: 'SecAccessCreate' is deprecated: first deprecated in macOS 10.10 - SecKeychain is deprecated [-Wdeprecated-declarations]
+warning: 'SecKeychainCreate' is deprecated: first deprecated in macOS 10.10 - SecKeychain is deprecated [-Wdeprecated-declarations]
+warning: 'SecKeychainGetStatus' is deprecated: first deprecated in macOS 10.10 - SecKeychain is deprecated [-Wdeprecated-declarations]
+warning: 'SecKeychainItemDelete' is deprecated: first deprecated in macOS 10.10 - SecKeychain is deprecated [-Wdeprecated-declarations]
+warning: 'SecKeychainLock' is deprecated: first deprecated in macOS 10.10 - SecKeychain is deprecated [-Wdeprecated-declarations]
+warning: 'SecKeychainOpen' is deprecated: first deprecated in macOS 10.10 - SecKeychain is deprecated [-Wdeprecated-declarations]
+warning: 'SecKeychainUnlock' is deprecated: first deprecated in macOS 10.10 - SecKeychain is deprecated [-Wdeprecated-declarations]
+warning: 'SecTrustedApplicationCreateFromPath' is deprecated: first deprecated in macOS 10.10 - SecKeychain is deprecated [-Wdeprecated-declarations]
+```
+
+Will try on an ubuntu amd64 vm.  
+Updating golang to `1.23.2`.  
+
+Updating my private network cardano node to latest version from maya node-launcher.
+
+```
+ghcr.io/intersectmbo/cardano-node:9.2.0@sha256:eaef180e80e87b97a75aa9d0e7050f5c9a74f721497856c7fa4e6b584825d7d2
+```
+
+Ah tests fail on new vm because of my replace directive, need to commit that
+somewhere.
+
+> replacement directory /Users/adc/code/cardano-go does not exist
+
+The cardano-node docker image installs these cardano binaries in the `/nix/store`
+location but there's some kind of hash prefix on the directory, so the binaries
+are not in a consistent location.
+
+```
+docker build -t fff -f - . <<EOF
+FROM ghcr.io/intersectmbo/cardano-node:9.2.0 AS source
+FROM alpine AS runner
+COPY --from=source /nix/store /nix/store
+EOF
+```
+
+```
+docker run -it --rm --name fff --entrypoint sh fff
+find /nix/store -name cardano-node -type f
+find /nix/store -name cardano-cli -type f
+
+/nix/store/36wc6c8583rd0vf26kfn6cwyxw8n5dml-cardano-node-exe-cardano-node-9.2.0/bin/cardano-node version
+/nix/store/gnfinsxkh8y98ylmafww34687wfqnflv-cardano-node-exe-cardano-node-9.2.0/bin/cardano-node version
+```
+
+The first one has a 0'd git revision, the second has a set value. Did the same to find the appropriate cardano-cli path.
+
+> There was an error parsing the genesis file: "/mount/data/genesis/conway-genesis.json" Error: "Error in $: key \"minFeeRefScriptCostPerByte\" not found"
+
+https://book.world.dev.cardano.org/environments/mainnet/conway-genesis.json
+
+
+> cardano-node: Conway related : There was an error parsing the genesis file: "/mount/data/genesis/conway-genesis.json" Error: "Error in $: key \"minFeeRefScriptCostPerByte\" not found
+> Command failed: genesis create-cardano  Error: Error while decoding Shelley genesis at: /mount/template/conway.json Error: Error in $: key "plutusV3CostModel" not found
+> Command failed: genesis create-cardano  Error: Error while decoding Shelley genesis at: /mount/template/conway.json Error: Error in $.committee: key "threshold" not found
+
+Okay after some config updates we're up and running again.  
+The cli and node version can diverge so that's something to watch out for.  
+Still getting babbage era reported from node.  
+
+Getting this from my old build tx command though:
+
+```
+CARDANO_NODE_NETWORK_ID=42 \
+CARDANO_NODE_SOCKET_PATH=/opt/node.socket \
+cardano-cli transaction build \
+  --babbage-era \
+  --cardano-mode \
+  --change-address addr_test1vr984kaehpmxlx8vqztryfjpu3578msak7uxvx5l9jlfxjq6wqfv6 \
+  --tx-in 8c78893911a35d7c52104c98e8497a14d7295b4d9bf7811fc1d4e9f449884284#0 \
+  --tx-out addr_test1vr984kaehpmxlx8vqztryfjpu3578msak7uxvx5l9jlfxjq6wqfv6+30000000 \
+  --out-file /dev/stdout
+```
+
+> Command failed: transaction build  Error: The era BabbageEra is deprecated. Please use the Conway era.
+
+```
+CARDANO_NODE_NETWORK_ID=42 \
+CARDANO_NODE_SOCKET_PATH=/opt/node.socket \
+cardano-cli transaction build \
+  --conway-era \
+  --cardano-mode \
+  --change-address addr_test1vr984kaehpmxlx8vqztryfjpu3578msak7uxvx5l9jlfxjq6wqfv6 \
+  --tx-in 8c78893911a35d7c52104c98e8497a14d7295b4d9bf7811fc1d4e9f449884284#0 \
+  --tx-out addr_test1vr984kaehpmxlx8vqztryfjpu3578msak7uxvx5l9jlfxjq6wqfv6+30000000 \
+  --out-file /dev/stdout
+```
+
+> Invalid option `--conway-era'
+
+```
+CARDANO_NODE_NETWORK_ID=42 \
+CARDANO_NODE_SOCKET_PATH=/opt/node.socket \
+cardano-cli transaction build \
+  --cardano-mode \
+  --change-address addr_test1vr984kaehpmxlx8vqztryfjpu3578msak7uxvx5l9jlfxjq6wqfv6 \
+  --tx-in 8c78893911a35d7c52104c98e8497a14d7295b4d9bf7811fc1d4e9f449884284#0 \
+  --tx-out addr_test1vr984kaehpmxlx8vqztryfjpu3578msak7uxvx5l9jlfxjq6wqfv6+30000000 \
+  --out-file /dev/stdout
+```
+
+> Command failed: transaction build  Error: The era BabbageEra is deprecated. Please use the Conway era.
+
+```
+CARDANO_NODE_NETWORK_ID=42 \
+CARDANO_NODE_SOCKET_PATH=/opt/node.socket \
+  cardano-cli conway transaction build \
+    --cardano-mode \
+    --change-address addr_test1vr984kaehpmxlx8vqztryfjpu3578msak7uxvx5l9jlfxjq6wqfv6 \
+    --tx-in 8c78893911a35d7c52104c98e8497a14d7295b4d9bf7811fc1d4e9f449884284#0 \
+    --tx-out addr_test1vr984kaehpmxlx8vqztryfjpu3578msak7uxvx5l9jlfxjq6wqfv6+30000000 \
+    --out-file /dev/stdout
+```
+
+> Command failed: transaction build  Error: Transactions can only be produced in the same era as the node. Requested era: Conway, node era: Babbage.
+
+Right there with ya.  
+Went back to the hydra project to see they have updated to 9.2.0.
+
+```
+git diff dfa41e830..d55c4efb8 -- demo
+```
+
+`./prepare-devnet`
+
+Their prepare script chmod recursive parameter is in the wrong place.
+
+`CARDANO_NODE_SOCKET_PATH=/opt/node.socket cardano-cli query tip --testnet-magic 42`
+
+```
+"TestConwayHardForkAtEpoch": 0,
+```
+
+THIS is the magic configuration value we need. It goes in the node config json.
+
+Now the build tx command above works.
+
+AuxData can be marshalled, add address utility commands, add get block/tx/utxo and broadcast rpc methods
+
+#### 17.102024 Thursday 6h
+
+First thing is to push my cardano-go library and reference that in mayanode.
+
+```
+git tag v0.1.0
+git push origin v0.1.0
+go list -m github.com/alexdcox/cardano-go@v0.1.0
+```
+
+Now to set that in mayanode, remove the replace directive and push.
+
+```
+go get github.com/alexdcox/cardano-go@v0.1.0
+```
+
+`make test` is telling me to add a couple of handfulls of new deps:
+```
+go get github.com/cosmos/cosmos-sdk/baseapp@v0.50.7
+go get github.com/cosmos/cosmos-sdk/client/input@v0.50.7
+go get github.com/cosmos/cosmos-sdk/client@v0.50.7
+go get github.com/cosmos/cosmos-sdk/codec/types@v0.50.7
+go get github.com/cosmos/cosmos-sdk/codec@v0.50.7
+go get github.com/cosmos/cosmos-sdk/crypto/codec@v0.50.7
+go get github.com/cosmos/cosmos-sdk/crypto/keyring@v0.50.7
+go get github.com/cosmos/cosmos-sdk/crypto/keys/ed25519@v0.50.7
+go get github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1@v0.50.7
+go get github.com/cosmos/cosmos-sdk/server/api@v0.50.7
+go get github.com/cosmos/cosmos-sdk/server/log@v0.50.7
+go get github.com/cosmos/cosmos-sdk/telemetry@v0.50.7
+go get github.com/cosmos/cosmos-sdk/types/mempool@v0.50.7
+go get github.com/cosmos/cosmos-sdk/types/module@v0.50.7
+go get github.com/cosmos/cosmos-sdk/types/query@v0.50.7
+go get github.com/cosmos/cosmos-sdk/types/tx/amino@v0.50.7
+go get github.com/cosmos/cosmos-sdk/types@v0.50.7
+go get github.com/cosmos/cosmos-sdk/version@v0.50.7
+go get github.com/cosmos/cosmos-sdk/x/auth/types@v0.50.7
+go get github.com/cosmos/cosmos-sdk/x/params/types@v0.50.7
+go get github.com/gorilla/handlers@v1.5.1
+go get github.com/grpc-ecosystem/grpc-gateway/runtime@v1.16.0
+go get github.com/tendermint/go-amino@v0.16.0
+```
+
+And that leads on to a number of other warnings:
+
+```
+go: warning: github.com/cosmos/iavl@v1.1.2: retracted by module author
+go: to switch to the latest unretracted version, run:
+  go get github.com/cosmos/iavl@latest
+go: warning: github.com/cosmos/iavl@v1.1.2: retracted by module author
+go: to switch to the latest unretracted version, run:
+  go get github.com/cosmos/iavl@latest
+go: warning: github.com/cosmos/iavl@v1.1.2: retracted by module author
+go: to switch to the latest unretracted version, run:
+  go get github.com/cosmos/iavl@latest
+go: warning: github.com/cosmos/iavl@v1.1.2: retracted by module author
+go: to switch to the latest unretracted version, run:
+  go get github.com/cosmos/iavl@latest
+go: warning: github.com/cosmos/iavl@v1.1.2: retracted by module author
+go: to switch to the latest unretracted version, run:
+  go get github.com/cosmos/iavl@latest
+go: warning: github.com/cosmos/iavl@v1.1.2: retracted by module author
+go: to switch to the latest unretracted version, run:
+  go get github.com/cosmos/iavl@latest
+```
+
+```
+go get github.com/cosmos/iavl@latest
+```
+
+```
+go: gitlab.com/mayachain/mayanode/x/mayachain/keeper imports
+  github.com/cosmos/cosmos-sdk/simapp: github.com/cosmos/cosmos-sdk/simapp@v0.0.0-20241017154543-c1707b830856: parsing go.mod:
+  module declares its path as: cosmossdk.io/simapp
+          but was required as: github.com/cosmos/cosmos-sdk/simapp
+```
+
+Fixed that with this F/R and a replace directive:
+
+```
+github.com/cosmos/cosmos-sdk/simapp
+cosmossdk.io/simapp
+```
+
+```
+go: gitlab.com/mayachain/mayanode/cmd/mayanode/cmd imports
+  github.com/cosmos/cosmos-sdk/store: github.com/cosmos/cosmos-sdk/store@v1.1.1: parsing go.mod:
+  module declares its path as: cosmossdk.io/store
+          but was required as: github.com/cosmos/cosmos-sdk/store
+```
+
+```
+github.com/cosmos/cosmos-sdk/store
+cosmossdk.io/store
+```
+
+Fix incorrect package name 'github.com/cosmos/cosmos-sdk/store' to 'cosmossdk.io/store'
+
+```
+go: gitlab.com/mayachain/mayanode/app imports
+  github.com/cosmos/ibc-go/v2/modules/apps/transfer/keeper tested by
+  github.com/cosmos/ibc-go/v2/modules/apps/transfer/keeper.test imports
+  github.com/cosmos/ibc-go/v2/testing/simapp imports
+  github.com/cosmos/cosmos-sdk/x/evidence: github.com/cosmos/cosmos-sdk/x/evidence@v0.1.1: parsing go.mod:
+  module declares its path as: cosmossdk.io/x/evidence
+          but was required as: github.com/cosmos/cosmos-sdk/x/evidence
+```
+
+```
+github.com/cosmos/cosmos-sdk/x/evidence
+cosmossdk.io/x/evidence
+```
+
+Fix incorrect package name 'github.com/cosmos/cosmos-sdk/x/evidence' to 'cosmossdk.io/x/evidence'
+
+```
+github.com/cosmos/cosmos-sdk/x/feegrant@v0.1.1
+cosmossdk.io/x/feegrant
+```
+
+Fix incorrect package name 'github.com/cosmos/cosmos-sdk/x/feegrant' to 'cosmossdk.io/x/feegrant'
+
+```
+github.com/cosmos/cosmos-sdk/x/upgrade@v0.1.4
+cosmossdk.io/x/upgrade
+```
+
+Fix incorrect package name 'github.com/cosmos/cosmos-sdk/x/upgrade' to 'cosmossdk.io/x/upgrade'
+
+Now make test is giving this:
+
+```
+common/cosmos/cosmos.go:33:37: undefined: sdk.NewRoute
+common/cosmos/cosmos.go:34:37: undefined: sdk.NewKVStoreKeys
+common/cosmos/cosmos.go:83:19: undefined: sdk.Route
+common/cosmos/cosmos.go:84:19: undefined: sdk.Uint
+common/cosmos/cosmos.go:85:19: undefined: sdk.Int
+common/cosmos/cosmos.go:93:19: undefined: sdk.Dec
+common/cosmos/cosmos.go:95:19: undefined: sdk.Iterator
+common/cosmos/cosmos.go:96:19: undefined: sdk.Handler
+common/cosmos/cosmos.go:97:19: undefined: sdk.StoreKey
+common/cosmos/cosmos.go:98:19: undefined: sdk.Querier
+common/cosmos/cosmos.go:34:37: too many errors
+```
+
+cosmos sdk docs show `sdk.NewRoute` in version `v0.45`.
+
+Ohhh mannn. That seems to be removed in v50.
+
+```
+git checkout develop -- go.mod go.sum
+
+go get -u=patch github.com/alexdcox/cardano-go@v0.1.1
+```
+
+So my dependencies in cardano-go were more recent than mayanode, which was
+causing the mayanode deps to be updated when importing my package.
+Unfortunately the cosmos team made some BC breaking changes from v45 to v50 by
+removing some types. Sooo it was easier to just copy the mayanode go.mod over
+and go from there.
+
+```
+./chunk.go:239:9: log.Println undefined (type *zerolog.Logger has no field or method Println)
+./util.go:22:14: undefined: edwards25519
+./util.go:24:9: undefined: edwards25519
+./util.go:117:18: undefined: errors.WithStack
+./util.go:214:18: undefined: errors.Errorf
+./util.go:244:16: undefined: errors.WithStack
+```
+
+```
+../../../../pkg/mod/nhooyr.io/websocket@v1.8.6/compress_notjs.go:10:2: missing go.sum entry for module providing package github.com/klauspost/compress/flate (imported by nhooyr.io/websocket); to add:
+  go get nhooyr.io/websocket@v1.8.6
+../../../../pkg/mod/github.com/olekukonko/tablewriter@v0.0.5/util.go:15:2: missing go.sum entry for module providing package github.com/mattn/go-runewidth (imported by github.com/olekukonko/tablewriter); to add:
+  go get github.com/olekukonko/tablewriter@v0.0.5
+make: *** [Makefile:119: build] Error 1
+```
+
+```
+go get nhooyr.io/websocket@v1.8.6
+go get github.com/olekukonko/tablewriter@v0.0.5
+```
+
+```
+common/address.go:580:50: cannot use &cardano.MainNetParams (value of type *cardano.NetworkParams) as cardano.Network value in argument to cardano.DecodeAddress
+common/address.go:585:58: undefined: cardano.PreProductionParams
+common/address.go:590:49: cannot use &cardano.PrivateNetParams (value of type *cardano.NetworkParams) as cardano.Network value in argument to cardano.DecodeAddress
+common/pubkey.go:169:24: undefined: cardano.NewAddressPubKeyHash
+```
+
+```
+x/mayachain/aggregators/dex.go:20:22: undefined: DexAggregators
+x/mayachain/aggregators/dex.go:34:22: undefined: DexAggregators
+```
+
+Hmm. Something to do with the build flags causing that function to be omitted.
+
+```
+make build-mocknet
+```
+
+```
+119.9 # gitlab.com/mayachain/mayanode/bifrost/pkg/chainclients/cardano
+119.9 bifrost/pkg/chainclients/cardano/client.go:275:4: result parameter err not in scope at return
+119.9   bifrost/pkg/chainclients/cardano/client.go:273:17: inner declaration of var err error
+119.9 bifrost/pkg/chainclients/cardano/client.go:279:4: result parameter err not in scope at return
+119.9   bifrost/pkg/chainclients/cardano/client.go:273:17: inner declaration of var err error
+119.9 bifrost/pkg/chainclients/cardano/client.go:285:4: result parameter err not in scope at return
+119.9   bifrost/pkg/chainclients/cardano/client.go:273:17: inner declaration of var err error
+119.9 bifrost/pkg/chainclients/cardano/client.go:297:60: cannot use txBody.Fee (variable of type uint64) as "github.com/cosmos/cosmos-sdk/types".Uint value in argument to common.NewCoin
+119.9 bifrost/pkg/chainclients/cardano/client.go:359:23: cannot convert tx.Coins.GetCoin(common.ADAAsset).Amount (value of type "github.com/cosmos/cosmos-sdk/types".Uint) to type uint64
+119.9 bifrost/pkg/chainclients/cardano/client.go:392:16: cannot use tx.Coins.GetCoin(common.ADAAsset).Amount (value of type "github.com/cosmos/cosmos-sdk/types".Uint) as uint64 value in struct literal
+119.9 bifrost/pkg/chainclients/cardano/client.go:720:48: cannot use 0.01 (untyped float constant) as uint64 value in argument to c.getUtxoToSpend (truncated)
+119.9 bifrost/pkg/chainclients/cardano/client.go:743:62: cannot use total (variable of type uint64) as "github.com/cosmos/cosmos-sdk/types".Uint value in argument to common.NewCoin
+119.9 bifrost/pkg/chainclients/cardano/client.go:746:25: c.lastFee undefined (type *Client has no field or method lastFee)
+```
+
+Nice! Successful mocknet build.
+
+Can I complete a smoke test at this point without adding anything cardano?
+
+```
+make smoke
+```
+
+Dear god almighty they take a while.  
+Clean smoke run. Brilliant.  
+
+Now to add the cardano node and configure the setup txs...
+
+- `build/docker/docker-compose.yml`
+- `/mocknet/init-cardano.sh`
+- `registry.gitlab.com/mayachain/devops/node-launcher:cardano-daemon-9.2.0`
+- `node-launcher:ci/images/cardano-daemon`
+  - Dockerfile
+
+ADA_HOST: ${ADA_HOST:-http://cardano:3631}
+
+Testing the cardano ci dockerfile:
+
+```
+DOCKER_BUILDKIT=0 docker build \
+  --build-arg CACHEBUST=$(date +%s) \
+  -t registry.gitlab.com/mayachain/devops/node-launcher:cardano-daemon-9.2.0 .
+```
+
+> sqlite3-binding.c:33983:42: error: 'pread64' undeclared here (not in a function); did you mean 'pread'?
+
+```
+CGO_CFLAGS="-D_LARGEFILE64_SOURCE"
+```
+
+```
+docker run --rm registry.gitlab.com/mayachain/devops/node-launcher:cardano-daemon-9.2.0 cardano-node version
+docker run --rm registry.gitlab.com/mayachain/devops/node-launcher:cardano-daemon-9.2.0 cardano-cli version
+docker run --rm registry.gitlab.com/mayachain/devops/node-launcher:cardano-daemon-9.2.0 cardano-rpc version
+```
+
+Okay so I don't have a `version` command for my rpc binary, but perhaps I should. Will add to the todo.
+
+Maybe a `log` command would be useful too? So I can follow cardano conventions and have a `run` command
+for the main service.
+
+```
+docker run --rm registry.gitlab.com/mayachain/devops/node-launcher:cardano-daemon-9.2.0
+```
+
+Alpine can't do this? `date -u -d "now + 2 seconds" +%FT%Tz`
+
+```
+docker run --rm alpine date -u -d "now + 2 seconds" +%FT%Tz
+docker run --rm -it --entrypoint sh registry.gitlab.com/mayachain/devops/node-launcher:cardano-daemon-9.2.0
+docker run --rm --entrypoint sh -it ghcr.io/intersectmbo/cardano-node:9.2.0 'date -u -d "now + 2 seconds" +%FT%TZ'
+```
+
+```
+docker run --rm --entrypoint sh ghcr.io/intersectmbo/cardano-node:9.2.0 -c '
+date -u -d "now + 2 seconds" +%FT%Tz
+'
+```
+
+> 2024-10-18T05:51:06Z
+
+```
+docker run --rm -it alpine sh
+```
+
+```
+docker run --rm alpine /bin/sh -c "
+cardano_start_time() {
+  current_timestamp=\$(date -u +%s)
+  future_timestamp=\$(expr \$current_timestamp + 2)
+  date -u +%Y-%m-%dT%H:%M:%SZ -d @\$future_timestamp
+}
+echo \$(cardano_start_time)
+"
+```
+
+Quick restart dev script:
+
+```
+while :; do
+  echo "press any key to restart..."
+  read input
+  docker build \
+    --progress plain \
+    -t registry.gitlab.com/mayachain/devops/node-launcher:cardano-daemon-9.2.0 .
+  docker run --rm -it -p 3001:3001 --name test registry.gitlab.com/mayachain/devops/node-launcher:cardano-daemon-9.2.0
+done
+```
+
+```
+docker run --rm -it --entrypoint sh registry.gitlab.com/mayachain/devops/node-launcher:cardano-daemon-9.2.0
+```
+
+> VRF private key file at: shelley.000.vrf.skeyhas "other" file permissions. Please remove all "other" file permissions.
+> VRF private key file at: shelley.000.vrf.skeyhas "group" file permissions. Please remove all "group" file permissions.
+
+```
+chmod 600 ./config/creds/*
+```
+
+> cardano-node: Byron leader credentials error: DelegationCertificateNotFromGenesisKey
+
+```
+cardano_start_time() {
+  current_timestamp=$(date -u +%s)
+  future_timestamp=$(expr $current_timestamp + 2)
+  date -u +%Y-%m-%dT%H:%M:%SZ -d @$future_timestamp
+}
+```
+
+> delegate-keys/shelley.000.vrf.skey: getFileStatus: does not exist (No such file or directory
+
+Got to node start!
+
+```
+docker exec test tail -F /var/log/rpc.log
+docker exec -it test /bin/sh
+```
+
+Data isn't being written to `./db` directory?
+
+This isn't very nice:
+> got 3 SIGTERM/SIGINTs, forcefully exiting
+
+> conn read error: read tcp 127.0.0.1:44760->127.0.0.1:3000: read: connection reset by peer
+
+So the slots are being reported but we're not generating new blocks for some reason:
+
+```
+{
+    "epoch": 0,
+    "era": "Conway",
+    "slotInEpoch": 0,
+    "slotsToEpochEnd": 432000,
+    "syncProgress": "100.00"
+}
+```
+
+> TraceNodeNotLeader
+
+
+I think it's because I'm not setting some of the addresses properly.
+
+byron
+
+working
+
+```json
+{
+  "bootStakeholders": {
+    "7a4519c93d7be4577dd85bd524c644e6b809e44eae0457b43128c1c7": 1
+  },
+  "heavyDelegation": {},
+  "nonAvvmBalances": {}
+}
+```
+
+invalid
+
+```json
+{
+  "bootStakeholders": {
+    "96b6a9c17c2478f0ecf1b72472c286b5ad741ed7dded42f258c22090": 1
+  },
+  "heavyDelegation": {
+    "96b6a9c17c2478f0ecf1b72472c286b5ad741ed7dded42f258c22090": {
+      "cert": "0e4b3c5a377cf4f76a5354362df47de4f65a620fb76500eb283b8a02adbbd0b0102b5424e569580c3dcf5a3c6b3233e08080043fbb4dd53bfee4d4803bd9a605",
+      "delegatePk": "7P0hBBEk5ZGEFdFdX5ND9B4aN3G0yNTDspWiWjzqainNKcUv037eBowc/3f7mXFZTNVvtliQuo4fnERhdCjsHA==",
+      "issuerPk": "hWvSHQIRaFJ4QSoUFq8oW4CDrHmgXk1/OxrieU/2+17WrM1qjbSiph11fdFj9gcOpfp7tSYCPHVYo+oUi5IanA==",
+      "omega": 0
+    }
+  },
+  "nonAvvmBalances": {
+    "2657WMsDfac59Ex3AvsXhEaoHLBGDM8NZViKQsPtJF7tQmfxuZSRSNP9fujbd6hm3": "0",
+    "2657WMsDfac7hZR4G5EdYBKh1kG6uy1Wrsj3UMyHxZAXGCTezeKyGhkWP1wvA3oWz": "30000000000000000"
+  }
+}
+```
+
+shelley
+
+working
+
+```json
+{
+  "activeSlotsCoeff": 1,
+  "epochLength": 5,
+  "genDelegs": {},
+  "initialFunds": {
+    "00813c32c92aad21770ff8001de0918f598df8c06775f77f8e8839d2a0074a515f7f32bf31a4f41c7417a8136e8152bfb42f06d71b389a6896": 900000000000,
+    "609783be7d3c54f11377966dfabc9284cd6c32fca1cd42ef0a4f1cc45b": 900000000000
+  },
+  "maxLovelaceSupply": 2000000000000,
+  "staking": {
+    "pools": {
+      "8a219b698d3b6e034391ae84cee62f1d76b6fbc45ddfe4e31e0d4b60": {
+        "cost": 0,
+        "margin": 0,
+        "metadata": null,
+        "owners": [],
+        "pledge": 0,
+        "publicKey": "8a219b698d3b6e034391ae84cee62f1d76b6fbc45ddfe4e31e0d4b60",
+        "relays": [],
+        "rewardAccount": {
+          "credential": {
+            "key hash": "b6ffb20cf821f9286802235841d4348a2c2bafd4f73092b7de6655ea"
+          },
+          "network": "Testnet"
+        },
+        "vrf": "fec17ed60cbf2ec5be3f061fb4de0b6ef1f20947cfbfce5fb2783d12f3f69ff5"
+      }
+    },
+    "stake": {
+      "074a515f7f32bf31a4f41c7417a8136e8152bfb42f06d71b389a6896": "8a219b698d3b6e034391ae84cee62f1d76b6fbc45ddfe4e31e0d4b60"
+    }
+  },
+  "systemStart": "2024-10-18T06:55:25Z",
+  "updateQuorum": 2
+}
+```
+
+invalid
+
+```json
+{
+  "activeSlotsCoeff": 0.05,
+  "epochLength": 432000,
+  "genDelegs": {
+    "6eb0035ed278b0c137a4a128f2634c9742f135643b6582c20164c462": {
+      "delegate": "6b908adb7ecde4b23106946f3e928dbd3eb7b8dff6adec5e413d8d4c",
+      "vrf": "f48ab9138dfaa56f64e5aba9101442344a3987d9ad3ce83f79d8f8ff2a3d6d22"
+    }
+  },
+  "initialFunds": {},
+  "maxLovelaceSupply": 45000000000000000,
+  "staking": {
+    "pools": {},
+    "stake": {}
+  },
+  "systemStart": "2024-10-18T06:55:54Z",
+  "updateQuorum": 1
+}
+```
+
+node config is pretty much the same.
+
+a5e4238b67ebb1108c52a01ac850bbce82c915d77bad94331892f3edf612883c
+
+In the above the initialFunds `609783be7d3c54f11377966dfabc9284cd6c32fca1cd42ef0a4f1cc45b` corresponds to the base16
+format faucet signing key.
+
+```bash
+jq_replace() {
+  if [ "$#" -ne 2 ]; then
+    echo "Usage: jq_replace <target_file> <jq_expression>"
+    return 1
+  fi
+
+  targetPath="$1"
+  jqExpression="$2"
+  tempfile=$(mktemp)
+
+  if jq "$jqExpression" "$targetPath" > "$tempfile"; then
+    mv "$tempfile" "$targetPath"
+  else
+    rm "$tempfile"
+    echo "jq operation failed"
+    return 1
+  fi
+}
+```
+
+> [c85d601b:cardano.node.Forge:Error:39] [2024-10-18 07:28:26.00 UTC] fromList [
+  ("credentials",String "Cardano"),("val",Object (fromList [
+  ("kind",String "TraceForgedInvalidBlock"),("reason",Object (fromList [
+  ("error",Object (fromList [("error",Object (fromList [
+  ("kind",String "NoCounterForKeyHashOCERT"),
+  ("stakePoolKeyHash",String "55b3d042b3925f98fcc6a3a623be055568995838b7d6d334fbcf2a51")])),("kind",String
+  "HeaderProtocolError")])),("kind",String "ValidationError")])),
+  ("slot",Number 29.0)]))]
+
+What is `NoCounterForKeyHashOCERT`?
+
+Google has 2 results, neither particularly explanatory.
+
+For tomorrow, if my address tool commands output json they'd be more usable in
+cli scripts.
+
+#### 18.102024 Friday 5h
+
+My local node still hasn't caught up for whatever reason, and not being able to
+resume the download with `kubectl cp` is not good enough. Going to start today
+with a quick ssh'able container with the volume mount for rsync. I need this
+mainnet data locally to run cbor decode/encode tests on every block until now.
+
+```
+kubectl run debug --rm -it --restart=Never \
+  --image=alpine:latest \
+  --overrides='
+{
+  "spec": {
+    "volumes": [
+      {
+        "name": "data",
+        "persistentVolumeClaim": {
+          "claimName": "cardano-daemon"
+        }
+      }
+    ],
+    "containers": [
+      {
+        "name": "debug",
+        "image": "alpine:latest",
+        "command": ["/bin/sh"],
+        "stdin": true,
+        "tty": true,
+        "ports": [{
+          "name": "ssh",
+          "containerPort": 26,
+          "protocol": "TCP"
+        }],
+        "volumeMounts": [
+          {
+            "name": "data",
+            "mountPath": "/cardano"
+          }
+        ]
+      }
+    ]
+  }
+}' \
+  -n mayanode-1
+```
+
+```
+apk add dropbear rsync
+
+mkdir ~/.ssh
+vi ~/.ssh/authorized_keys
+chmod 0600 ~/.ssh/authorized_keys
+
+DROPBEAR_EXTRA_ARGS="-w -s" dropbear -ERp 26
+
+kubectl -n mayanode-1 port-forward debug 2626:26
+
+ssh -o UserKnownHostsFile=/dev/null root@127.0.0.1 -p 2626
+
+rsync -avzP \
+  -e 'ssh -p 2626 -o UserKnownHostsFile=/dev/null' \
+  root@127.0.0.1:/cardano \
+  /Users/adc/Desktop/maya-cardano-network/mainnet
+```
+
+That's beautiful. Fast, resumable, compressed OTW, with progress/logging.
+Started at 2:40pm approx.
+
+Right onwards.
+
+Where is this key `8a219b698d3b6e034391ae84cee62f1d76b6fbc45ddfe4e31e0d4b60`
+coming from?
+
+```
+docker exec -it test find
+```
+
+The keys from that are:
+
+```
+./delegate-keys/shelley.000.vkey
+./delegate-keys/shelley.000.vrf.vkey
+./delegate-keys/shelley.000.kes.skey
+./delegate-keys/byron.000.key
+./delegate-keys/shelley.000.kes.vkey
+./delegate-keys/shelley.000.vrf.skey
+./delegate-keys/shelley.000.skey
+./utxo-keys/shelley.000.vkey
+./utxo-keys/byron.000.key
+./utxo-keys/shelley.000.skey
+./genesis-keys/shelley.000.vkey
+./genesis-keys/byron.000.key
+./genesis-keys/shelley.000.skey
+
+./delegate-keys/shelley.000.counter.json
+./delegate-keys/shelley.000.opcert.json
+./delegate-keys/byron.000.cert.json
+```
+
+https://github.com/input-output-hk/technical-docs/blob/main/cardano-components/cardano-node/doc/reference/shelley-genesis.md
+
+```
+docker exec test find . \( -name '*.vkey' -or -name '*.skey' \) -exec cat {} \+
+docker exec test find . \( -name '*.vkey' -or -name '*.skey' \) -exec cat {} \; | jq -r '.cborHex'
+docker exec test find . \( -name '*.vkey' -or -name '*.skey' \) -exec sh -c "a='{}';echo \$a;cat \$a" \;
+```
+
+```
+go run ./cli/addr_build --key 58202cf0274c13811d6659687bf1ef7b6fa7d75d975b00f375c3c673a6eb1164f1e2
+60bb281805200b43320215248a73f370d99165a4b2d5e9652a21099801
+go run ./cli/addr_build --key 58204b797ce03b4c1dee32350d77721ee00dcc84b25e508df6283239651fa5197991
+60477f8fb774d8fdf840629c07235e3fc40665f948fbf3c44ddf9935af
+go run ./cli/addr_build --key 582057dd354d2f994da58783e48785daf7c6f950ebb935805d94f982836ceefec10a
+60f4e7052a3863018483e5089d4ff111d35fc25a43d86980cb038ed236
+```
+
+```
+docker exec test cardano-cli genesis hash --genesis /cardano/shelley-genesis.json
+9272a37101997fffdbefcc6111f0fdf4bad5cd0de21cf259454ebb3086405aa1
+```
+
+The genesis keys are for governance.
+The genesis delegate keys are for non-decentralised initial block production.
+The utxo keys are for the first spendable amounts generated during genesis.
+
+```
+docker exec test cardano-cli shelley genesis key-hash --verification-key-file genesis-keys/shelley.000.vkey
+```
+
+> Command failed: genesis key-hash  Error: genesis-keys/shelley.000.vkey:
+  TextEnvelope type error:  Expected one of: GenesisVerificationKey_ed25519,
+  GenesisDelegateVerificationKey_ed25519, GenesisUTxOVerificationKey_ed25519
+  Actual: GenesisExtendedVerificationKey_ed25519_bip32
+
+```
+docker exec test cardano-cli shelley genesis key-hash --verification-key-file delegate-keys/shelley.000.vkey
+```
+
+> ee79786237d422a17cfd2fdf5991d19b46bc4efa614fd36f3a383956
+
+```json
+"genDelegs": {
+  "b80bde3c9b57aab1ce41ee11a26a51b639f41be4d7bde3d25d540364": {
+    "delegate": "ee79786237d422a17cfd2fdf5991d19b46bc4efa614fd36f3a383956",
+    "vrf": "58d9c86db06dbf44d12aecb0c5d552396b62c74f8061061a1b5fb9ab14d5259d"
+  }
+}
+```
+
+```
+docker exec test find . -name '*.vkey' -exec sh -c "cardano-cli shelley genesis key-hash --verification-key-file {}" \;
+```
+
+```
+rm -rf /tmp/cardano && docker cp test:/cardano /tmp/cardano/
+```
+
+/tmp/cardano/delegate-keys/shelley.000.vkey
+519511940706c356584c912606c05738c3b96df7a1528c038e81c1ae
+Blake2bSum224(entire key)
+= genDeleg.X.delegate
+
+/tmp/cardano/delegate-keys/shelley.000.vrf.vkey
+70f1146d58d58956e40bdf55a55ab6f6f1c427a91d084f81dce51e75
+not found
+
+/tmp/cardano/delegate-keys/shelley.000.kes.skey
+7020668d6327fd06494f68efd450a6533fd09557861130c4499116f1
+not found
+
+/tmp/cardano/delegate-keys/byron.000.key
+836cc68931c2e4e3e838602eca1902591d216837bafddfe6f0c8cb07
+not found
+
+/tmp/cardano/delegate-keys/shelley.000.kes.vkey
+d7a425bdbbfcdc8d37dce2b720135a1129a1bba6f3b5ab69f16bed7a
+not
+
+/tmp/cardano/delegate-keys/shelley.000.vrf.skey
+569fd548339e1a4dcae1b448bbc9bfa5ddad27b41d5ca49626aaa8eb
+not
+
+/tmp/cardano/delegate-keys/shelley.000.skey
+f961750d0c2217af097e26a8f0042a65a730ef809c4982630fc8853e
+n
+
+/tmp/cardano/utxo-keys/shelley.000.vkey
+d45db52b425605eb381db94b24967c51fe0c3174558d88b862ec21b1
+n
+
+/tmp/cardano/utxo-keys/byron.000.key
+836cc68931c2e4e3e838602eca1902591d216837bafddfe6f0c8cb07
+n
+
+/tmp/cardano/utxo-keys/shelley.000.skey
+97dfc332f5e783c19330b0a7f77d7020dd06e9ea66766586342611a1
+n
+
+/tmp/cardano/genesis-keys/shelley.000.vkey
+8584c8d2278e28785de59f5d3c03aabd1db73e9f1739a92d7a969476
+Blake2bSum224(first 32 bytes / private)
+= genDeleg.X
+
+/tmp/cardano/genesis-keys/byron.000.key
+836cc68931c2e4e3e838602eca1902591d216837bafddfe6f0c8cb07
+n
+
+/tmp/cardano/genesis-keys/shelley.000.skey
+3c862fc74e49c6fd2d00b8e054f940ffcc4c970697de0364570c6d2e
+n
+
+The cli doesn't seem to work with the genesis key but it's just a blake2b224
+hash of the private key so I get that bit.
+
+Not sure how the genDeleg.X.vrf is hashed. The cli can't handle it? Seems to
+be a new change not covered by this doc.
+
+```
+docker exec test cardano-cli shelley genesis key-hash --verification-key-file delegate-keys/shelley.000.vrf.vkey
+```
+
+> Command failed: genesis key-hash  Error: delegate-keys/shelley.000.vrf.vkey:
+  TextEnvelope type error:  Expected one of: GenesisVerificationKey_ed25519,
+  GenesisDelegateVerificationKey_ed25519, GenesisUTxOVerificationKey_ed25519
+  Actual: VrfVerificationKey_PraosVRF
+
+```
+docker exec test cardano-cli shelley genesis initial-addr --testnet-magic 42 --verification-key-file utxo-keys/shelley.000.vkey
+```
+
+> Command failed: genesis initial-addr
+  Error: /cardano/utxo-keys/shelley.000.vkey: TextEnvelope type error:
+  Expected: GenesisUTxOVerificationKey_ed25519 Actual:
+  PaymentVerificationKeyByron_ed25519_bip32
+
+Damn this is where my experience and the docs really start to diverge.
+
+This might be what I need to actually get going as well. Hmm.
+
+```
+docker exec test cardano-cli byron genesis initial-addr --testnet-magic 42 --verification-key-file utxo-keys/shelley.000.vkey
+```
+
+```
+go run ./cli/addr_decode --address addr_test1vztc80na8320zymhjekl40yjsnxkcvhu58x59mc2fuwvgkc332vxv
+network:           privnet
+addr header byte:  payment/testnet | 0x60 | 01100000
+addr (8-bit):      609783be7d3c54f11377966dfabc9284cd6c32fca1cd42ef0a4f1cc45b
+addr (bech32):     addr_test1vztc80na8320zymhjekl40yjsnxkcvhu58x59mc2fuwvgkc332vxv
+```
+
+```
+go run ./cli/addr_build --key 5820a5e4238b67ebb1108c52a01ac850bbce82c915d77bad94331892f3edf612883c
+network:           privnet
+addr header byte:  payment/testnet | 0x60 | 01100000
+addr (8-bit):      609783be7d3c54f11377966dfabc9284cd6c32fca1cd42ef0a4f1cc45b
+addr (bech32):     addr_test1vztc80na8320zymhjekl40yjsnxkcvhu58x59mc2fuwvgkc332vxv
+```
+
+Following the docs again from the start:
+
+```
+cardano-cli shelley genesis create --testnet-magic 42 --genesis-dir example
+```
+
+> Command failed: genesis create  Error: example/genesis.alonzo.spec.json: example/genesis.alonzo.spec.json: openBinaryFile: does not exist (No such file or directory)
+
+Oh. That was short lived.
+
+```
+vi example/genesis.alonzo.spec.json
+vi example/genesis.conway.spec.json
+```
+
+Those specs have to be created.
+
+```
+cardano-cli shelley genesis create --testnet-magic 42 --genesis-dir example
+
+vi example/genesis.alonzo.spec.json
+vi example/genesis.conway.spec.json
+
+cardano-cli shelley genesis key-gen-genesis \
+    --verification-key-file example/genesis-keys/genesis1.vkey \
+    --signing-key-file example/genesis-keys/genesis1.skey
+
+cardano-cli shelley genesis key-gen-genesis \
+    --verification-key-file example/genesis-keys/genesis2.vkey \
+    --signing-key-file example/genesis-keys/genesis2.skey
+
+cardano-cli shelley genesis key-gen-delegate \
+    --verification-key-file example/delegate-keys/delegate1.vkey \
+    --signing-key-file example/delegate-keys/delegate1.skey \
+    --operational-certificate-issue-counter example/delegate-keys/delegate-opcert1.counter
+
+cardano-cli shelley genesis key-gen-delegate \
+    --verification-key-file example/delegate-keys/delegate2.vkey \
+    --signing-key-file example/delegate-keys/delegate2.skey \
+    --operational-certificate-issue-counter example/delegate-keys/delegate-opcert2.counter
+
+cardano-cli shelley genesis key-gen-utxo \
+    --verification-key-file example/utxo-keys/utxo1.vkey \
+    --signing-key-file example/utxo-keys/utxo1.skey
+
+cardano-cli shelley genesis key-gen-utxo \
+    --verification-key-file example/utxo-keys/utxo2.vkey \
+    --signing-key-file example/utxo-keys/utxo2.skey
+
+cardano-cli shelley genesis create --testnet-magic 42 --genesis-dir example
+
+cardano-cli shelley genesis key-hash \
+    --verification-key-file example/genesis-keys/genesis1.vkey
+
+cardano-cli shelley genesis key-hash \
+    --verification-key-file example/delegate-keys/delegate1.vkey
+
+cardano-cli shelley genesis initial-addr \
+  --testnet-magic 42 \
+  --verification-key-file example/utxo-keys/utxo1.vkey
+
+cardano-cli shelley genesis initial-txin \
+  --testnet-magic 42 \
+  --verification-key-file example/utxo-keys/utxo1.vkey
+
+cardano-cli shelley genesis key-hash \
+  --verification-key-file example/utxo-keys/utxo1.vkey
+
+cardano-cli shelley genesis create \
+  --testnet-magic 42 \
+  --genesis-dir example/ \
+  --supply 1000000
+```
+
+I abandoned all that in favor of just using hardcoded files from the working
+version. Would be helpful to know how these things are set but for now I just
+need to move on.
+
+#### 22.10.2024 Tuesday 5h
+
+Main problem at the moment is the dial method is failing for some reason.
+
+```
+while :; do
+  echo "press any key to restart..."
+  read input
+  docker build \
+    --progress plain \
+    --build-arg TAG=v0.1.4 \
+    -t registry.gitlab.com/mayachain/devops/node-launcher:cardano-daemon-9.2.0 .
+  docker run --rm -it -p 3001:3001 --name test registry.gitlab.com/mayachain/devops/node-launcher:cardano-daemon-9.2.0
+done
+```
+
+Added an exponential backoff that will attempt to connect to the node 5 times
+during startup before failing.
+
+Changed `TAG` to `CARDANO_GO_VER` to be more explicit.
+
+```
+while :; do
+  echo "press any key to restart..."
+  read input
+  cd /Users/adc/code/cardano-go
+  VERSION=$(git tag -l | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' | sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1)
+  cd -
+  echo "building version $VERSION ..."
+  docker build \
+    --progress plain \
+    --build-arg CARDANO_GO_VER="$VERSION" \
+    -t registry.gitlab.com/mayachain/devops/node-launcher:cardano-daemon-9.2.0 .
+  docker run --rm -it -p 3001:3001 --name test registry.gitlab.com/mayachain/devops/node-launcher:cardano-daemon-9.2.0
+done
+```
+
+```
+docker exec -it test tail -F /var/log/rpc.log
+```
+
+```
+cardano-rpc \
+  --databasepath /cardano/cardano.db \
+  --socketpath /opt/node.socket \
+  --rpchostport 0.0.0.0:3001 \
+  --nodehostport 0.0.0.0:3000 \
+  --nodedatapath /cardano/db \
+  --network privnet \
+  --nodeconfigpath /cardano/config.json \
+  --byronconfigpath /cardano/byron.json \
+  --shelleyconfigpath /cardano/shelley.json
+```
+
+Maybe I can just set it to always use the latest tag?
+
+```
+git tag --sort=-v:refname | head -n 1
+git tag -l | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' | sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1
+```
+
+To build docker using symlinks to other repos you can send the files to docker
+using tar as below:
+
+I had to add this build flag to go: `-buildvcs=false`
+
+```
+ln -s /Users/adc/code/cardano-go .
+
+while :; do
+  echo "press any key to restart..."
+  read input
+  tar -ch . | docker build - \
+    --progress plain \
+    -t registry.gitlab.com/mayachain/devops/node-launcher:cardano-daemon-9.2.0
+  docker run --rm -it -p 3001:3001 --name test registry.gitlab.com/mayachain/devops/node-launcher:cardano-daemon-9.2.0
+done
+```
+
+```
+docker exec -it test tail -F /var/log/rpc.log
+```
+
+```
+while :; do
+  echo "press any key to restart..."
+  read input
+  docker build \
+    --progress plain \
+    -t registry.gitlab.com/mayachain/devops/node-launcher:cardano-daemon-9.2.0 .
+  docker run --rm -it -p 3001:3001 --name test --stop-timeout 60 registry.gitlab.com/mayachain/devops/node-launcher:cardano-daemon-9.2.0
+done
+```
+
+```
+while :; do
+  echo "press any key to rebuild..."
+  read input
+  docker build \
+    --progress plain \
+    --no-cache \
+    -t registry.gitlab.com/mayachain/devops/node-launcher:cardano-daemon-9.2.0 .
+done
+```
+
+Okay that's done. So whoever added cardano to the node-launcher project used the
+official image in the k8s deployment. We need a custom image with my rpc
+project baked in moving forwards. Also for the private network we needed to add
+all of the appropriate config files and keys into the node-launcher repo. As
+I'm relying on it I just went ahead and did that.
+
+I've put some kind of no_push github rule on the node-launcher repo? Oh to stop
+from accidentally pushing ctx maya configs. Umm:
+
+```
+git remote set-url --push origin git@gitlab.com:mayachain/devops/node-launcher.git
+git remote set-url --push origin no_push
+git remote -v
+git push --set-upstream origin cardano-privnet
+```
+
+> ERROR: You are not allowed to push code to this project.
+
+Oh. Maybe I was being too careful.
+
+```
+git remote add adc git@gitlab.com:alexdcox/maya-node-launcher.git
+```
+
+There we go:  
+https://gitlab.com/alexdcox/maya-node-launcher/-/tree/cardano-privnet
+
+Back to the mayanode project smoke tests.
+
+```bash
+export COMPOSE_PROFILES="mocknet,midgard"
+export COMPOSE_PROJECT_NAME=thorchain
+```
+
+```bash
+while true; do
+  docker-compose up --remove-orphans -d
+  echo -n "Press enter to STOP thorchain..."
+  read ignored
+
+  docker-compose down --volumes
+  echo -n "Press enter to RESTART thorchain..."
+  read ignored
+done
+```
+
+```bash
+docker-compose logs -f thornode bifrost
+```
+
+```bash
+EXPORT=data/smoke_test_balances.json EXPORT_EVENTS=data/smoke_test_events.json make test
+make smoke
+```
+
+What do I need to do/add/update?
+- [ ] ./Dockerfile (which one was I talking about?)
+- [x] ./requirements.txt
+- [x] ./chains/aliases.py
+- [ ] ./chains/cardano.py
+- [ ] ./data/smoke_test_balances.json
+- [ ] ./data/smoke_test_events.json
+- [ ] ./data/smoke_test_transactions.json
+- [ ] ./scripts/smoke.py
+- [ ] ./tests/test_smoke.py
+- [ ] ./thorchain/thorchain.py
+- [ ] ./utils/common.py
+
+master
+priv: ef235aacf90d9f4aadd8c92e4b2562e1d9eb97f0df9ba3b508258739cb013db2
+ada:  addr_test1vrejz6eyzpwnk5k33adtzdwuahehag4eerg9u7jdj66hjcqzwpg7z
+
+contrib l
+priv: 289c2857d4598e37fb9647507e47a309d6133539bf21a8b9cb6df88fd5232032
+ada:  addr_test1vq3y76rp7m4zkvk3uaz8g9mrwcl5yz9fq5q0umqqsxz6gdqws0el9
+
+user1
+priv: e810f1d7d6691b4a7a73476f3543bd87d601f9a53e7faf670eac2c5b517d83bf
+ada:  addr_test1vrsymch3jrmcaslxu23hg8jdahw5wgyrkeandk56gyv2nhsadex87
+
+provider1
+priv: a96e62ed3955e65be32703f12d87b6b5cf26039ecfa948dc5107a495418e5330
+ada:  addr_test1vq07qc6nexr9uetwenuuqna8nq6ukftmyljntnn3zw5x69geav0we
+
+provider2
+priv: 9294f4d108465fd293f7fe299e6923ef71a77f2cb1eb6d4394839c64ec25d5c0
+ada:  addr_test1vpxhe4fjjvzy66lz3e4flp9hp4q7yaq47f777927rf9ddgc98ayrd
+
+--generate-balances=True
+
+What's the last smoke test number? `77`?
+
+Took about 20m to run the test. 15m for the actual test and 5m or so setup.
+
+If I'm going to be running this a lot, I'll definitely have to select just a
+few currencies rather than all of them every time.
+
+Asked Itzamna if they still use the generate-balances arg or if they just set
+things manually.
+
+```
+pip index versions pycardano
+echo 'pycardano==0.12.0' >> requirements.txt
+```
+
+cardano cli raw transaction build requires:
+- change addr
+- out addr
+- in utxo
+- amount
+
+Do we just use that for the python code?
+
+#### 24.10.2024 Thursday 6h
+
+Faucet Info
+addr_test1vppf7k5kahkfw67ttl5p0clpsmlylg2n3t5gej36rp9qmtg96xp2l
+900000000000 / 900k
+
+Added setting the utxo threshold to the status endpoint and adding a check
+against that in bifrost.
+
+84a300d9010281825820a7295e440f40f80e2ca7a0fdbcb9ede6f7ded0f2da97d800322b0c7301897b3b01018282581d60ca7adbb9b8766f98ec0096322641e469e3ee1db7b8661a9f2cbe93481a01c9c38082581d60ca7adbb9b8766f98ec0096322641e469e3ee1db7b8661a9f2cbe93481b000000d18a13f993021a0002990da100d9010281825820ce13cd433cdcb3dfb00c04e216956aeb622dcd7f282b03304d9fc9de804723b25840dfae244c2e494f03b7c7d852f02252b5c3abb83356b050fb26fdceb09c5b020874b1fddbb19f7b42d6bc3c80128af163dace7d1e8118287efb864d4b1066270af5f6
+
+```
+CARDANO_NODE_NETWORK_ID=42 \
+CARDANO_NODE_SOCKET_PATH=/opt/node.socket \
+  cardano-cli conway transaction build \
+    --cardano-mode \
+    --change-address addr_test1vr984kaehpmxlx8vqztryfjpu3578msak7uxvx5l9jlfxjq6wqfv6 \
+    --tx-in 8c78893911a35d7c52104c98e8497a14d7295b4d9bf7811fc1d4e9f449884284#0 \
+    --tx-out addr_test1vr984kaehpmxlx8vqztryfjpu3578msak7uxvx5l9jlfxjq6wqfv6+30000000 \
+    --out-file /dev/stdout \
+    --json-metadata-no-schema "{\"test\": \"hi there\"}"
+```
+
+```
+cardano-cli transaction calculate-min-fee \
+  --tx-body-file tx.draft \
+  --tx-in-count 1 \
+  --tx-out-count 1 \
+  --witness-count 1 \
+  --byron-witness-count 0 \
+  --testnet-magic 1097911063 \
+  --protocol-params-file protocol.json
+```
+
+[{
+  0: [[h'0A90AEB8FEA1D3945823DF00231DF72050609BDEA1DA42621F7940733C0A1E60', 0]],
+  1: [[h'608293F4FAB87CE7E1319E4581A33E821C118EF844590EBDA9B6BE46BB', 1500000], [h'60E0B4CBC6A7FED60537EC93CE0F3AFAE5166BA9B4EA9126994358C05C', 18446744073709351616]],
+  2: 200000,
+  7: h'EF42BDB69F436E267B07A59C22C9509CB0CA30D0E5F35C81696717C5803E2A26'},
+{
+  0: [[h'13B8C139DE73F80946B40292F5FA4F83B9B0F7747E859BE4AE512F4333E4DBCF', h'B92D175D8F0984C193B22D66422596B5142AFA96FBD49AA1E2EA005F33654EE3E553055DB741282BEBB612E17CC9EE42F2614FB2D47A0894E8B4838341F8C908']]
+},
+true,
+{0: {1337: {"maya": ["memo:sometestmemohere"]}}}
+]
+
+[
+{
+  0: 258([[h'8C78893911A35D7C52104C98E8497A14D7295B4D9BF7811FC1D4E9F449884284', 0]]),
+  1: [[h'6014C97B3B192465B1EC506D79FD08DC508E15471B5E9E01C15C6CF098', 10000000], [h'60429F5A96EDEC976BCB5FE817E3E186FE4FA1538AE88CCA3A184A0DAD', 899989826579]],
+  2: 173421,
+  7: h'2DA99AB4EACDBD2778951DF5481B447A59916689F7100918ED2FBD928ABAEF76'
+},
+{0: 258([[h'CE13CD433CDCB3DFB00C04E216956AEB622DCD7F282B03304D9FC9DE804723B2', h'49AEA1A2BD472794C2A668D9348A12B6E79866494DCCA3A561220BF6FB82851A6060E3507491D0C3E5A1D2D336EF0A3594A78481516D06CE342E79A5F5A90E00']])
+},
+true,
+259({0: {333: {"maya": ["memo:sometestmemohere"]}}})
+]
+
+
+[
+{
+  0: [[h'8C78893911A35D7C52104C98E8497A14D7295B4D9BF7811FC1D4E9F449884284', 0]],
+  1: [[h'6014C97B3B192465B1EC506D79FD08DC508E15471B5E9E01C15C6CF098', 10000000], [h'60429F5A96EDEC976BCB5FE817E3E186FE4FA1538AE88CCA3A184A0DAD', 899989826579]],
+  2: 173421,
+  7: h'2DA99AB4EACDBD2778951DF5481B447A59916689F7100918ED2FBD928ABAEF76'
+},
+{0: [[h'CE13CD433CDCB3DFB00C04E216956AEB622DCD7F282B03304D9FC9DE804723B2', h'49AEA1A2BD472794C2A668D9348A12B6E79866494DCCA3A561220BF6FB82851A6060E3507491D0C3E5A1D2D336EF0A3594A78481516D06CE342E79A5F5A90E00']]
+},
+true,
+{0: {333: {"maya": ["memo:sometestmemohere"]}}}
+]
+
+Having a quick look at apollo.  
+How easy is it to build a simple tx with metadata?  
+There are 9 todos in the tx builder struct.  
+
+Not a byte match for a simple tx like this:
+
+```
+84a400d90102818258208c78893911a35d7c52104c98e8497a14d7295b4d9bf7811fc1d4e9f44988428400018282581d6014c97b3b192465b1ec506d79fd08dc508e15471b5e9e01c15c6cf0981a0098968082581d60429f5a96edec976bcb5fe817e3e186fe4fa1538ae88cca3a184a0dad1b000000d18b92ec13021a0002a56d0758202da99ab4eacdbd2778951df5481b447a59916689f7100918ed2fbd928abaef76a0f5d90103a100a119014da1646d61796181756d656d6f3a736f6d65746573746d656d6f68657265
+```
+
+```
+C0/192 + 14/20 = 212
+217 - 192 = 25
+
+D7/215
+
+0(0) =     C0 00
+23(0) =    D7 00
+24(0) =    D8 18
+200(0) =   D8 C8 00
+2000(0) =  D9 07D0 00
+70000(0) = DA 00011170 00
+```
+
+Rule for cbor tag encoding is this:  
+If the tag is < 24, add the tag to 0xC0.  
+If the tag is >= 24, add the number of bytes required to encode the value to 0xD7, then encode append those bytes  
+
+cbor: tag number 0 must be followed by text string, got positive integer  
+cbor: tag number 2 or 3 must be followed by byte string, got positive integer
+
+```
+18C8/200
+
+18/24
+D8/216
+
++C0/192 to the first byte?
+
+25(0)
+D8 19 # tag(25)
+   00 # unsigned(0)
+
+D8/216 - C0/192 = 24
+```
+
+```
+84a400d901028182582090479e4a7f50137affbddbdfeb7a7e9a514b36c1afda8e2cbf4b2d0076495e8300018282581d608293f4fab87ce7e1319e4581a33e821c118ef844590ebda9b6be46bb1a0016e36082581d60e0b4cbc6a7fed60537ec93ce0f3afae5166ba9b4ea9126994358c05c1bfffffffffffcf2c0021a00030d400758204327ab189c9adc382b68b6fc3415114cb28ebb33b1b46f1d8e14fa5c856e6502a1008182582013b8c139de73f80946b40292f5fa4f83b9b0f7747e859be4ae512f4333e4dbcf584003dbb8b87c4b40b3c2788bca68f37692a178397938565418cd4611db6650f2b3ae7382cb539cd89d8d6adb69ec3146624ad553a8b0b7985d26291bb184d24506f5d90103a100a1190539a1646d61796181756d656d6f3a736f6d65746573746d656d6f68657265
+```
+
+> MaryValue: expected array or int, got TypeInteger
+
+```
+addr1
+09d5c8ea6cd66623f6864b68d85088b6c5b2d4f3f919a2104d88f974c21347bf
+addr_test1vrstfj7x5lldvpfhajfuure6ltj3v6afkn4fzf5egdvvqhq2dth6v
+
+addr2
+d491c844c3873c32635fb2456b30ae1e5c2cc5b7d1e51169f9d9ce06af1ab52f
+addr_test1vzpf8a86hp7w0cf3nezcrge7sgwprrhcg3vsa0dfk6lydwcttrlsu
+```
+
+Perfect byte match again with conway this time AND a generic to/from tag struct
+that's easier to use than apollo.
+
+Where are we with the mainnet data download?  
+Done.  
+
+Okay going to do another block parse and index check.
+
+/Users/adc/Desktop/maya-cardano-network/mainnet/cardano/data/db
+
+apollo doesn't have a block struct
+
+The first entry in the chunk store is a bit strange, some genesis data. It has
+21600 what seem to be hashes. The general structure is like this:
+
+```
+[
+  0,
+  [
+    [
+      764824073,
+      h'5f20df933584822601f9e3f8c024eb5eb252fe8cefb24d1317dc3d432e940ebb',
+      h'54f0972807b68698fcd704e3dae675dc43c8a6656aeaf4891e6e3f23be2de00a',
+      [0, [0]],
+      [{}]
+    ],
+    [
+      _ h'af2800c124e599d6dec188a75f8bfde397ebb778163a18240371f2d1',
+      h'1deb82908402c7ee3efeb16f369d97fba316ee621d09b32b8969e54b',
+      h'1deb82908402c7ee3efeb16f369d97fba316ee621d09b32b8969e54b',
+      ... x 21600 ...
+    ],
+    [{}]
+  ]
+]
+```
+
+We got to shelley:  
+4494238 | Shelley | 4563820 | 78f46f9ceff8741ce744bfb6d6b4d7715963b08503f9a32ebb639acd6487362d | 5  
+then it broke:  
+19:58:05 FTL cbor: invalid map key type: []interface {}  
+
+Still this is looking promising.  
+Don't think I actually stored block num -> chunk did I?  
+Oh I did, get chunk range. Think I need to restore that.  
+
+#### 28.10.2024 Monday 4h
+
+located block 4563820 at chunk 276  
+Oh I was searching by block number not slot.  
+It's actually chunk 211.  
+
+```
+block hash:   78f46f9ceff8741ce744bfb6d6b4d7715963b08503f9a32ebb639acd6487362d
+cardanoscan:  4494061
+betaexplorer: 4494061
+```
+
+```
+2 | Shelley | 5961600 | 3a2c7576568ff6c421c9fea95929d880421611414f4f7c16c999f6ce44ab944a | 1
+34576 | Byron | 34593 | c542b402114d987aa193eaeb9f5b2c57aa1acedfe0f105600ee3ef3d6592bd0f | 0
+249004 | Byron | 249032 | 65da27c9c09abea04326b46bde4c6547f75377762ac3e2e335944400bd08d9ce | 0
+86539 | Byron | 86568 | fe1741edc21d3de59d41e6c5c7592107ab0677d43a09ea982b5a4d403cdc2c6a | 0
+```
+
+New discovery, the first "block" of a chunk file (other than chunk 0) should be
+skipped. Seems to link to the previous block or something? That's what happens
+on cardanoscan when you search for 1941d944df546dea699791c318aeb9cc63b94e4cdb133d79856cda35bf7ecbb1
+it actually shows you the last block from the previous chunk 3bd04916b6bc2ad849d519cfae4ffe3b1a1660c098dbcd3e884073dd54bc8911.
+
+The beta explorer doesn't display much info for these e.g.
+https://beta.explorer.cardano.org/en/block/af82845f28b968c49eeb5b9cdb902af357435fe2a2c45dfb9ac7196adf9c1470
+
+I'm adding a point index for it just incase we need it.
+
+Right if we can get a full chain index now I can move on...
+
+It's not obvious from the config but these values are equivalent:
+
+```
+config  | node rpc     | smoke    | default
+---     | ---          | ---      | ---
+minFeeB | txFeeFixed   | tx_fixed | 155381
+minFeeA | txFeePerByte | tx_rate  | 44
+```
+
+Let's say I started indexing at 8:30.
+
+> 6341372 | Alonzo | 42098312 | e0fcd23a7cd7c0085471bced2487e91e0ec8cb2c2dd2594c0e448985280d0fdb | 20
+> CHUNK
+> 21:35:58 FTL cbor: invalid UTF-8 string
+
+Looks like it was chunk `1949`
+
+#### 29.10.2024 Tuesday 2h
+
+Continuing the chunk/block scan from yesterday, currently at 3905/6398.
+
+Looking good.
+
+Going to look at smokes while that runs.
+
+- [x] ./scripts/smoke.py
+  - [x] import
+  - [x] parser argn
+  - [x] smoker initialise
+  - [x] smoker init def
+  - [x] smoker init + setup
+  - [x] broadcast_chain
+  - [x] broadcast_simulator
+  - [x] set_network_fees
+  - [x] run / check chain
+- [ ] ./chains/cardano.py
+- [ ] ./tests/test_smoke.py
+- [ ] ./thorchain/thorchain.py
+- [ ] ./utils/common.py
+
+- [ ] ./data/smoke_test_balances.json
+- [ ] ./data/smoke_test_events.json
+- [ ] ./data/smoke_test_transactions.json
+
+```
+EXPORT=data/smoke_test_balances.json EXPORT_EVENTS=data/smoke_test_events.json make test
+make smoke
+```
+
+```
+./gouroboros -address backbone.cardano.iog.io:3001 -network mainnet -ntn chain-sync -bulk -start-era byron
+
+./gouroboros -address localhost:3300 -network-magic 42 -ntn chain-sync
+```
+
+Wish I'd found this sooner.
+
+apollo has a Wallet:SignTx function.
+
+Need to move my cardano-mainnet.sqlite file out of cardano-go in order to build.
+
+Seeing if I can rework the tx build I already have using apollo...
+
+#### 04.11.2024 Monday 6h
+
+Chunk/block scan finished. Amazing.
+
+Tests...  
+Unit tests are passing but there isn't a test for cardano yet.  
+Smokes won't run.  
+
+```
+ => ERROR [ 6/10] RUN pip install -r requirements.txt
+
+11.64 ERROR: Cannot install -r requirements.txt (line 23) and -r requirements.txt (line 9) because these package versions have conflicting dependencies.
+11.64
+11.64 The conflict is caused by:
+11.64     web3 5.9.0 depends on websockets<9.0.0 and >=8.1.0
+11.64     pycardano 0.12.0 depends on websockets<14.0 and >=13.0
+11.64
+11.64 To fix this you could try to:
+11.64 1. loosen the range of package versions you've specified
+11.64 2. remove package versions to allow pip attempt to solve the dependency conflict
+11.64
+11.64 ERROR: ResolutionImpossible: for help visit https://pip.pypa.io/en/latest/topics/dependency-resolution/#dealing-with-dependency-conflicts
+```
+
+```
+ => ERROR [ 3/10] RUN apt-get update && apt-get install -y libsecp256k1-1 build-essential git
+------
+ > [ 3/10] RUN apt-get update && apt-get install -y libsecp256k1-1 build-essential git:
+#0 0.499 Get:1 http://deb.debian.org/debian bookworm InRelease [151 kB]
+#0 0.549 Get:2 http://deb.debian.org/debian bookworm-updates InRelease [55.4 kB]
+#0 0.568 Get:3 http://deb.debian.org/debian-security bookworm-security InRelease [48.0 kB]
+#0 0.888 Err:1 http://deb.debian.org/debian bookworm InRelease
+#0 0.888   At least one invalid signature was encountered.
+#0 0.928 Err:2 http://deb.debian.org/debian bookworm-updates InRelease
+#0 0.928   At least one invalid signature was encountered.
+#0 0.968 Err:3 http://deb.debian.org/debian-security bookworm-security InRelease
+#0 0.968   At least one invalid signature was encountered.
+#0 1.028 Reading package lists...
+#0 1.038 W: GPG error: http://deb.debian.org/debian bookworm InRelease: At least one invalid signature was encountered.
+#0 1.038 E: The repository 'http://deb.debian.org/debian bookworm InRelease' is not signed.
+#0 1.038 W: GPG error: http://deb.debian.org/debian bookworm-updates InRelease: At least one invalid signature was encountered.
+#0 1.038 E: The repository 'http://deb.debian.org/debian bookworm-updates InRelease' is not signed.
+#0 1.038 W: GPG error: http://deb.debian.org/debian-security bookworm-security InRelease: At least one invalid signature was encountered.
+#0 1.038 E: The repository 'http://deb.debian.org/debian-security bookworm-security InRelease' is not signed.
+```
+
+Have the apt keys expired or something?
+
+```
+  --security-opt seccomp=unconfined \
+
+docker run \
+  --rm \
+  --entrypoint bash \
+  -it \
+  -v $(pwd):/mnt \
+  python:3.10-slim-bullseye
+
+apt-get update && apt-get install -y libsecp256k1-1 build-essential git
+```
+
+Could be because my vm is out of space?
+
+Fully wiped docker. System prune with `--volumes` along with
+image/container/volume list and force delete.  
+
+```
+swapoff /swap.img && rm /swap.img
+```
+
+Yeah that did it. 67G free now and smokes running...
+
+First run failed:
+
+```
+E[2024-11-05 01:32:34,845] Status 500 - timed out waiting for tx to be included in a block
+E[2024-11-05 01:32:34,845] Smoke tests failed
+Traceback (most recent call last):
+  File "/app/scripts/smoke.py", line 161, in main
+    smoker.run()
+  File "/app/scripts/smoke.py", line 734, in run
+    self.broadcast_chain(txn)
+  File "/app/scripts/smoke.py", line 478, in broadcast_chain
+    return self.mock_mayachain.transfer(txn)
+  File "/app/chains/mayachain.py", line 156, in transfer
+    result = self.lcd_client.tx.broadcast(tx)
+  File "/usr/local/lib/python3.10/site-packages/terra_sdk/client/lcd/api/_base.py", line 29, in decorator
+    return instance._run_sync(async_call(instance, *args, **kwargs))
+  File "/usr/local/lib/python3.10/site-packages/terra_sdk/client/lcd/api/_base.py", line 13, in _run_sync
+    return self._c.loop.run_until_complete(coroutine)
+  File "/usr/local/lib/python3.10/site-packages/nest_asyncio.py", line 98, in run_until_complete
+    return f.result()
+  File "/usr/local/lib/python3.10/asyncio/futures.py", line 201, in result
+    raise self._exception.with_traceback(self._exception_tb)
+  File "/usr/local/lib/python3.10/asyncio/tasks.py", line 232, in __step
+    result = coro.send(None)
+  File "/usr/local/lib/python3.10/site-packages/terra_sdk/client/lcd/api/tx.py", line 315, in broadcast
+    res = await self._broadcast(tx, "BROADCAST_MODE_BLOCK", options)
+  File "/usr/local/lib/python3.10/site-packages/terra_sdk/client/lcd/api/tx.py", line 264, in _broadcast
+    return await self._c._post("/cosmos/tx/v1beta1/txs", data)  # , raw=True)
+  File "/usr/local/lib/python3.10/site-packages/terra_sdk/client/lcd/lcdclient.py", line 328, in _post
+    result = await super()._post(*args, **kwargs)
+  File "/usr/local/lib/python3.10/site-packages/terra_sdk/client/lcd/lcdclient.py", line 141, in _post
+    raise LCDResponseError(message=result.get("message"), response=response)
+terra_sdk.exceptions.LCDResponseError: Status 500 - timed out waiting for tx to be included in a block
+make: *** [Makefile:220: smoke] Error 1
+```
+
+This test vm has 25GB memory and 12 cores (24 vcores)  
+Surely that's enough??  
+Attempt 2...  
+
+I might reduce things to bitcoin + dash. Then switch to bitcoin + cardano. Then
+this should be much faster.
+
+> Deploying ARB contracts
+
+Is taking forever.
+
+Errors from mayanode:
+
+```
+ERR app/x/mayachain/manager_store_common.go:269 > fail to parse address: %s
+```
+
+```
+ERR app/x/mayachain/manager_network_current.go:1212 > error calculating rewards totalBonded=0 totalProvidedLiquidity=50000000005
+```
+
+Wow it took 16 minutes before the test even STARTED running.  
+I'd rewrite the whole goddamn thing.  
+That's a huge bottleneck to progress.  
+
+Second run failed.
+
+```
+I[2024-11-05 01:46:01,676] 31 PROVIDER-1 => VAULT      [ADD:THOR.RUNE:PROVIDER-1] 1,000.00000000 MAYA.CACAO
+I[2024-11-05 01:46:07,406] 32 PROVIDER-1 => VAULT      [ADD:THOR.RUNE:PROVIDER-1] 200.00000000 THOR.RUNE
+E[2024-11-05 01:46:17,417] Status 500 - timed out waiting for tx to be included in a block
+E[2024-11-05 01:46:17,417] Smoke tests failed
+```
+
+Trying with a clean develop branch, latest commit.
+
+When the tests fail all the docker machines keep running??  
+Found this command in the Makefile
+
+```
+make stop-mocknet
+```
+
+Sick of constantly trying git alises on my vm and them not being available. Using
+bash not zsh but I found an alternative. Logout and back in to use.
+
+```
+sudo curl -L https://gist.githubusercontent.com/mkczyk/646b69f85f0214f813d3a3da951d7df2/raw/734ae9f7720d0b5399bbe8b463cf5ec37b9a5064/.git-plugin-bash.sh > /etc/profile.d/git-aliases.sh
+```
+
+> fatal: detected dubious ownership in repository at '/home/adc/mayanode'
+
+Wow, getting all the weird random issues today.
+
+```
+git config --global --add safe.directory '*'
+```
+
+Shortcuts of the day:
+
+```
+docker logs -f docker-mayanode-1
+docker logs -f docker-arbitrum-1
+
+docker image rm registry.gitlab.com/mayachain/mayanode:smoke
+
+make stop-mocknet
+```
+
+> Unable to locate package libsecp256k1-1
+
+Not sure if this package was originally available but it seems to be
+now `libsecp256k1-dev`.
+
+Docker compose plugin ver `v2.29.2-desktop.2`  
+Updated to `v2.29.7-desktop.1`
+
+Are the bifrost env variables actually disabling the chains:
+- [x] KUJI
+- [ ] ETH
+- [x] GAIA
+- [X] BNB
+- [x] XRD
+- [x] THOR
+- [x] AVAX
+- [x] ARB
+
+Okay ETH is the problem child. Is it an easy fix to disable?  
+The bifrost docker-compose service depends on ethereum and binance. Nicht gut.  
+
+There's a `Deploying ETH contracts` part to the mayanode start script. Needs to
+be skipped if ETH is disabled.
+
+The disabled env vars need to be shared with both bifrost AND mayanode if we
+want the maya scripts to read them.
+
+```
+KUJI_DISABLED: true
+ETH_DISABLED: true
+GAIA_DISABLED: true
+BNB_DISABLED: true
+XRD_DISABLED: true
+THOR_DISABLED: true
+AVAX_DISABLED: true
+ARB_DISABLED: true
+```
+
+Looks like the python unit tests are not working?
+
+> TypeError: 'NotImplementedType' object is not callable
+
+```
+root@docker-desktop:/app# python -m unittest tests/test_*
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.10/runpy.py", line 196, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/usr/local/lib/python3.10/runpy.py", line 86, in _run_code
+    exec(code, run_globals)
+  File "/usr/local/lib/python3.10/unittest/__main__.py", line 18, in <module>
+    main(module=None)
+  File "/usr/local/lib/python3.10/unittest/main.py", line 100, in __init__
+    self.parseArgs(argv)
+  File "/usr/local/lib/python3.10/unittest/main.py", line 147, in parseArgs
+    self.createTests()
+  File "/usr/local/lib/python3.10/unittest/main.py", line 158, in createTests
+    self.test = self.testLoader.loadTestsFromNames(self.testNames,
+  File "/usr/local/lib/python3.10/unittest/loader.py", line 220, in loadTestsFromNames
+    suites = [self.loadTestsFromName(name, module) for name in names]
+  File "/usr/local/lib/python3.10/unittest/loader.py", line 220, in <listcomp>
+    suites = [self.loadTestsFromName(name, module) for name in names]
+  File "/usr/local/lib/python3.10/unittest/loader.py", line 154, in loadTestsFromName
+    module = __import__(module_name)
+  File "/app/tests/test_mayachain.py", line 5, in <module>
+    from mayachain.mayachain import (
+  File "/app/mayachain/mayachain.py", line 29, in <module>
+    from chains.radix import Radix
+  File "/app/chains/radix.py", line 6, in <module>
+    from radix_engine_toolkit import *
+  File "/usr/local/lib/python3.10/site-packages/radix_engine_toolkit/__init__.py", line 2974, in <module>
+    _UniffiLib = _uniffi_load_indirect()
+  File "/usr/local/lib/python3.10/site-packages/radix_engine_toolkit/__init__.py", line 566, in _uniffi_load_indirect
+    file_name: str = library_file_name()
+  File "/usr/local/lib/python3.10/site-packages/radix_engine_toolkit/__init__.py", line 562, in library_file_name
+    raise NotImplemented(
+TypeError: 'NotImplementedType' object is not callable
+```
+
+Radix has not been implemented properly? Just as well I want to disable it.
+
+Friendly reminder to myself: the `EXPORT` and `EXPORT_BALANCES` env vars are
+read within the python unit tests - specifically `test_smoke` - and write the
+balances and events json files which the smoke tests run against. The balances
+json needs to be updated manually.
+
+BNB/binance is so intertwined with the tests that I'm going to revert and leave
+that in. Actually that's what I did with my thorchain/dash implementation, just
+read through my notes. Will do the same here with bnb/ada.
+
+Okay first unit run with just bnb and dash failed:
+
+```
+I[2024-11-05 05:48:59,860] 2 PROVIDER-1 => VAULT      [ADD:DASH.DASH:PROVIDER-1] 3,000.00000000 MAYA.CACAO
+I[2024-11-05 05:48:59,861] Transaction: 2 PROVIDER-1 => VAULT      [ADD:DASH.DASH:PROVIDER-1] 3,000.00000000 MAYA.CACAO
+I[2024-11-05 05:48:59,861] >>>>>> Expected
+I[2024-11-05 05:48:59,861] None
+I[2024-11-05 05:48:59,861] >>>>>> Obtained
+I[2024-11-05 05:48:59,861] {'CONTRIB': {},
+ 'OUT': 0,
+ 'POOL.DASH.DASH': {'DASH.DASH': 0, 'MAYA.CACAO': 0},
+ 'PROVIDER-1': {},
+ 'PROVIDER-2': {},
+ 'TX': 2,
+ 'USER-1': {},
+ 'VAULT': {}}
+I[2024-11-05 05:48:59,861] >>>>>> DIFF
+I[2024-11-05 05:48:59,862] {'type_changes': {'root': {'new_type': <class 'NoneType'>,
+                           'new_value': None,
+                           'old_type': <class 'dict'>,
+                           'old_value': {'CONTRIB': {},
+                                         'OUT': 0,
+                                         'POOL.DASH.DASH': {'DASH.DASH': 0,
+                                                            'MAYA.CACAO': 0},
+                                         'PROVIDER-1': {},
+                                         'PROVIDER-2': {},
+                                         'TX': 2,
+                                         'USER-1': {},
+                                         'VAULT': {}}}}}
+E
+```
+
+It did complain about jsonpickle not being installed.
+
+```
+pip install jsonpickle
+```
+
+Nah didn't help. Not sure the diff is the right way round though, why would we
+expect nothing??
+
+I just deleted test_mayachain.py for now because it doesn't actually relate to
+the smoke tests much.
+
+Oh after setting the EXPORT/EXPORT_EVENTS vars it continued on much further until
+this error:
+
+```
+======================================================================
+ERROR: test_smoke (tests.test_smoke.TestSmoke)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/app/tests/test_smoke.py", line 131, in test_smoke
+    outbounds = mayachain.handle(txn)  # process transaction in mayachain
+  File "/app/mayachain/mayachain.py", line 901, in handle
+    out_txs = self.handle_withdraw(tx)
+  File "/app/mayachain/mayachain.py", line 1278, in handle_withdraw
+    max_gas=[Coin(gas.asset, dynamic_fee)],
+AttributeError: 'int' object has no attribute 'asset'
+```
+
+That's me for today.
+
+#### 05.11.2024 Tuesday 6h
+
+Switched a few `if` statements around in test_smoke so that if `export` is
+provided, we don't see the confusing `Expected None Obtained {...}` test
+output.
+
+Unit tests seem to be working and generating balances / events now:
+
+```
+0     MASTER => USER-1     [SEED] 40.00000000 DASH.DASH
+1     MASTER => PROVIDER-1 [SEED] 400.00000000 DASH.DASH
+2 PROVIDER-1 => VAULT      [ADD:DASH.DASH:PROVIDER-1] 3,000.00000000 MAYA.CACAO
+3 PROVIDER-1 => VAULT      [ADD:DASH.DASH:PROVIDER-1] 350.00000000 DASH.DASH
+4 PROVIDER-2 => VAULT      [ADD:MAYA.CACAO] 50,000.00000000 MAYA.CACAO
+[-] 49,980.00000000 MAYA.CACAO | Fee 20.00000000 MAYA.CACAO | Gas 20.00000000 MAYA.CACAO
+5     USER-1 => VAULT      [ ] 200.00000000 MAYA.CACAO
+[-] 180.00000000 MAYA.CACAO | Fee 20.00000000 MAYA.CACAO | Gas 20.00000000 MAYA.CACAO
+6     USER-1 => VAULT      [ABDG?] 200.00000000 MAYA.CACAO
+[-] 180.00000000 MAYA.CACAO | Fee 20.00000000 MAYA.CACAO | Gas 20.00000000 MAYA.CACAO
+7     USER-1 => VAULT      [SWAP:MAYA.CACAO:USER-1] 10.00000000 DASH.DASH
+[+] 61.01851851 MAYA.CACAO | Fee 20.00000000 MAYA.CACAO | Gas 20.00000000 MAYA.CACAO
+8 PROVIDER-1 => VAULT      [WITHDRAW:DASH.DASH:1000] 0.00000001 MAYA.CACAO
+[+] 35.99995000 DASH.DASH | Fee 0.00020000 DASH.DASH | Gas 0.00000000 DASH.DASH
+[+] 271.66666667 MAYA.CACAO | Fee 20.00000000 MAYA.CACAO | Gas 20.00000000 MAYA.CACAO
+9 PROVIDER-1 => VAULT      [WITHDRAW:DASH.DASH] 0.00000001 MAYA.CACAO
+[+] 2,604.99959492 MAYA.CACAO | Fee 20.00000000 MAYA.CACAO | Gas 20.00000000 MAYA.CACAO
+[+] 324.00005000 DASH.DASH | Fee 0.00000000 DASH.DASH | Gas 0.00000000 DASH.DASH
+```
+
+```
+E Bad Dash balance: USER-1 0.00000000 DASH.DASH != 40.00000000 DASH.DASH
+E Smoke tests failed
+Traceback (most recent call last):
+  File "/app/scripts/smoke.py", line 161, in main
+    smoker.run()
+  File "/app/scripts/smoke.py", line 757, in run
+    self.check_chain(self.dash, self.mock_dash, self.bitcoin_reorg)
+  File "/app/scripts/smoke.py", line 377, in check_chain
+    self.error(
+  File "/app/scripts/smoke.py", line 279, in error
+    raise Exception(err)
+Exception: Bad Dash balance: USER-1 0.00000000 DASH.DASH != 40.00000000 DASH.DASH
+```
+
+That error could be more descriptive. I updated it:
+
+```
+Bad Dash balance: USER-1 simulated: 40.00000000 DASH.DASH, mock: 0.00000000 DASH.DASH
+```
+
+So our simulation thinks the USER-1 dash address `yLLFQTxaW3wybbahkhyZcrdfqoRCnfzAV5`
+should have 40 dash.
+
+```
+docker exec dash1 dash-cli getaddressbalance '"yLLFQTxaW3wybbahkhyZcrdfqoRCnfzAV5"'
+{
+  "balance": 0,
+  "balance_immature": 0,
+  "balance_spendable": 0,
+  "received": 4000000000
+}
+```
+
+Right, it's not spendable for some reason. Wonder if the tx is being sent before
+the dash quorum is setup. Could switch to a different chain, but I'd rather get
+things working on a chain/project I'm familiar with then switch to cardano.
+
+> Bad Dash balance: VAULT simulated: 324.00002980 DASH.DASH, mock: 324.00001804 DASH.DASH
+
+2980 - 1804 = 1176
+
+Well that sucks. Guess my old fee rate calculation is no longer as precise as it
+used to be. Suppose that's been manually corrected to keep the smoke tests
+working and the python left to decay. Oh well, I'm on cardano no time to dally.
+
+```
+VAULT simulated: 324.00002980 DASH.DASH, mock: 324.00001804 DASH.DASH
+```
+
+> ERR app/bifrost/pkg/chainclients/loadchains.go:112 > failed to load chain error="fail to create block scanner: Post \"http://bitcoin:18443\": dial tcp: lookup bitcoin on 127.0.0.11:53: no such host" chain=BTC module=bifrost service=bifrost
+
+> ERR app/x/mayachain/manager_network_current.go:1212 > error calculating rewards totalBonded=0 totalProvidedLiquidity=312499941543
+
+```
+INF app/bifrost/signer/sign.go:261 > Signing transaction height=26 module=signer num=0 service=bifrost status=1 tx={"aggregator":"","chain":"DASH","coins":[{"amount":"3599992784","asset":"DASH.DASH"}],"gas_rate":12,"in_hash":"814C81BFEF7C1609060566DB7F9D08CE6D7E8506A9FDC6BBEEFD55DC9D82F396","max_gas":[{"amount":"5412","asset":"DASH.DASH","decimals":8}],"memo":"OUT:814C81BFEF7C1609060566DB7F9D08CE6D7E8506A9FDC6BBEEFD55DC9D82F396","out_hash":"","to":"yXdzzagQPwWXdZzFD2vRmsYMxgeD6o9D2L","vault_pubkey":"tmayapub1addwnpepqdsfvj69axrdjshshy8szww7f8fpeymvs0pmprjz7h798uwmuj34gzkfw8s"}
+INF app/bifrost/pkg/chainclients/dash/signer.go:281 > max gas is: [5412 DASH.DASH], however only: 3336 is required, gap: 2076 goes to customer module=dash service=bifrost
+INF app/bifrost/pkg/chainclients/dash/signer.go:307 > total: 36000000000, to customer: 3599994860, gas: 3336 module=dash service=bifrost
+INF app/bifrost/pkg/chainclients/dash/signer.go:312 > send 32400001804 back to self module=dash service=bifrost
+INF app/bifrost/pkg/chainclients/dash/signer.go:407 > UTXOs to sign: 2 module=dash service=bifrost
+INF app/bifrost/pkg/chainclients/dash/signer.go:433 > final size: 452, final vbyte: 452 module=dash service=bifrost
+INF app/bifrost/pkg/chainclients/dash/signer.go:557 > broadcast to DASH chain successfully hash=864693cdc81351d12281b2da93e3b1ad3025ea42c1eb999db1c85ba1547f5dbe module=dash service=bifrost
+```
+
+```
+docker exec dash1 dash-cli getrawtransaction 864693cdc81351d12281b2da93e3b1ad3025ea42c1eb999db1c85ba1547f5dbe true
+docker exec dash1 dash-cli getrawtransaction e317f21ba305aba367171429e77abe52206afe2fbfa4e4c0dfca8b49857f20da true
+```
+
+> out coins not matching 3599994856 DASH.DASH != 3599994860 DASH.DASH
+
+Left number is sim, right is actual.
+
+Just got caught up in cyber chef with base16 vs hex. Here's a note for myself:
+
+> "To/From Base" is for converting presentation of integers.  
+> "To/From Hex" is for encoding/decoding bytes as hexadeximal strings.
+
+The withdraw txs are 452 in dash, we're expecting 451.
+
+I think the OUT memo is a new addition for mayanode withdraw txs. That's what's
+throwing the fee estimation off.
+
+Basically, I think the test balance / event generation is completely broken
+because OUT memos are never considered when calculating withdrawal tx fees.
+
+Oh another cool thing, the USER-1 value in balances.json is always empty and
+never written. It's just there as a fun little red herring?
+
+```
+01000000
+02
+  65d35ea060699674ae51a4e7dc5d08e169f69d3d9fa2f76e74839b78362e6622000000006a473044022074f95250b57e7bceb75a4e4d703696bdf8051668fb19168d721b8f2b28064d080220450161f5d88d6b4253ae7fcce402f0f933527e6f6307fe977a22b7c781fcc592012102497f3cd50d94710777882bf45790d9681bbc6a57ca0afff43e766e08c0e7afcdffffffff
+f323e81829e148e924721c6687c08cea918cda74450cabf973fb7b216dd577c4000000006b483045022100d89932c531972f5fc826301f60cac2e2937211674f72347ebeb60540dd85e25a02204290256830095ab294337b3a4031cf90cdd64d5b719ed31a7ffd4c15994ef3f4012102497f3cd50d94710777882bf45790d9681bbc6a57ca0afff43e766e08c0e7afcdffffffff
+03
+ec8f93d6000000001976a9147c2bb42a8be69791ec763e51f5a49bcd41e8223788ac
+0ccb308b070000001976a914a8975c796e4b8fed2132b948fe8da2ee9ecb5ff388ac
+0000000000000000466a444f55543a38313443383142464546374331363039303630353636444237463944303843453644374538353036413946444336424245454644353544433944383246333936
+00000000
+```
+
+Looks like dash inputs can also be 148 bytes as opposed to just 147.
+
+```go
+gasCoin := c.getGasCoin(totalSize)
+```
+
+Right, finally getting the same value after some spreadsheet number crunching.
+Not sure what the state of thorchain was when I coded the dash bifrost client
+buuutttt, the estimateTxSize no longer works. Or it's no longer being used
+correctly, in every case. There's a hardcoded `assumedOutputs := 1` in
+`estimateTxSize`. The withdrawal tx has 3 outputs:  
+1 to the customer  
+1 change back to the vault (optional - I suppose)  
+1 memo (for tracking - I guess)  
+
+Just checked my thorchain logs, I deffo had the above understanding:
+
+> standard bifrost out tx with 1 input and 3 outputs
+
+So why has that been set to 1?
+
+Anyway my calculations now match the bifrost logs:
+
+```
+memo        = OUT:814C81BFEF7C1609060566DB7F9D08CE6D7E8506A9FDC6BBEEFD55DC9D82F396
+memo len    = 68
+tx size     = version + input counter + (input count * per input) + output counter + (output count * per output) + memo header + memo len + locktime
+            = 4 + 1 + (2 * 147) + 1 + (1 * 34) + 11 + 68 + 4
+            = 417
+fee rate    = 8
+fee         = tx size * fee rate
+            = 417 * 8
+            = 3336
+```
+
+but the smokes, how are they getting so close but with presumably such a
+divergent calculation
+
+I can't work out how the sim is calculating `3599994856`. It's for the outbound
+transaction.
+
+```
+sim_catch_up -> sim_trigger_tx -> set_network_fees -> set_dash_tx_rate
+             -> MayachainState:handle -> handle_withdraw -> get_gas -> get_max_gas
+```
+
+`sim_catch_up` is NOT called when attempting the EXPORT...  
+`set_network_fees` is ONLY called from `sim_trigger_tx`  
+So fees are never set correctly when running the export?  
+I'm so confused, again. I remember these being a bit of a nightmare.  
+
+I think `self.dash_estimate_size = 278` could just be a "winged" value to make
+the tests pass. Not a single mention of that value in my previous notes.
+
+Coin(Dash.coin, amount)
+
+fee vs gas?
+I think the fee is the cacao fee and the gas is the target chain fee/gas currency.
+
+#### 06.11.2024 Wednesday 6h 30m
+
+So I spent yesterday trying to make any rhyme or reason of the smoke tests. It
+didn't go well. I'm going to revert some of my changes back to a point where
+the smoke tests worked, then attempt to whittle down to just dash again.
+
+Maybe I should skip the export? Maybe it's been broken for a while?
+
+Bitol did say he thinks the balance json file has been broken since radix, but
+I worry it's a lot worse than that.
+
+In txs json, `gas` is always `null`.  
+In events json, `height` is always `null`.  
+In events json `MAYA_txid` is always `TODO`.  
+In events in fact, all `CHAIN_txid` values are `TODO`.  
+In events, there are 7 `type: rewards` all with 0 value `bond_reward`.  
+
+Just a quick rant: why bother having all these null values? There's more to read
+in order to get a complete picture, which in turn requires more brain power,
+which in this case means more of my time, which raises the cost of maintenance
+and slows progress. I end up wasting time on unnecessary things getting
+increasingly frustrated to a point where I have to waste even more time to
+write a little rant like this to vent those emotions. Ok back on track...
+
+The 1k lines of txs json could be reduced to 79 lines of csv with far greater
+redability and just as much programmatic parsability. I've just formatted them
+nicely here to aid my understanding.
+
+json is good for nested data, seeing as this is flat, we may as well use csv.
+What WOULD be good is if we take this csv and then generate a smoke.json output
+which combines txs, events and balances in a way which clearly shows that this
+X transaction causes these X events and after those the balances should be X.
+Instead we have to look across 3 files, cross-referencing by tx index which is
+not actually written but parsed, so to understand it we have to keep a mental
+index. It's just not meant for human consumption, but the fact the generators
+are broken means we have to edit them manually, which is a bit shitty let's be
+honest. Also, sometimes the smoke tests check against static json files and
+sometimes they check against in-memory values from the simulator, so it
+sometimes throws out errors with numbers I cannot search for. I really want to
+rewrite these goddamn smokes.
+
+```
+ 0 | MASTER to USER-1     | SEED                                                              | BTC   |                    2 BTC.BTC
+ 1 | MASTER to PROVIDER-1 | SEED                                                              | BTC   |                    5 BTC.BTC
+ 2 | MASTER to USER-1     | SEED                                                              | KUJI  |              500,000 KUJI.KUJI
+ 3 | MASTER to PROVIDER-1 | SEED                                                              | KUJI  |              500,000 KUJI.KUJI
+ 4 | MASTER to USER-1     | SEED                                                              | KUJI  |              500,000 KUJI.USK
+ 5 | MASTER to PROVIDER-1 | SEED                                                              | KUJI  |              500,000 KUJI.USK
+ 6 | MASTER to USER-1     | SEED                                                              | DASH  |                   40 DASH.DASH
+ 7 | MASTER to PROVIDER-1 | SEED                                                              | DASH  |                  400 DASH.DASH
+ 8 | MASTER to USER-1     | SEED                                                              | THOR  |                   20 THOR.RUNE
+ 9 | MASTER to PROVIDER-1 | SEED                                                              | THOR  |                  200 THOR.RUNE
+10 | MASTER to PROVIDER-2 | SEED                                                              | BTC   |                    5 BTC.BTC
+11 | MASTER to USER-1     | SEED                                                              | ETH   |      400,000,000,000 ETH.ETH
+12 | MASTER to PROVIDER-1 | SEED                                                              | ETH   |      400,000,000,000 ETH.ETH
+13 | MASTER to USER-1     | SEED                                                              | ARB   |      400,000,000,000 ARB.ETH
+14 | MASTER to PROVIDER-1 | SEED                                                              | ARB   |      400,000,000,000 ARB.ETH
+15 | MASTER to PROVIDER-1 | SEED                                                              | XRD   |                1,000 XRD.XRD
+16 | MASTER to USER-1     | SEED                                                              | XRD   |                1,000 XRD.XRD
+17 | MASTER to USER-1     | SEED                                                              | ETH   |    4,000,000,000,000 ETH.TKN-0X52C84043CD9C865236F11D9FC9F56AA003C1F922
+18 | MASTER to PROVIDER-1 | SEED                                                              | ETH   |    4,000,000,000,000 ETH.TKN-0X52C84043CD9C865236F11D9FC9F56AA003C1F922
+19 | PROVIDER-1 to VAULT  | ADD:KUJI.KUJI:PROVIDER-1                                          | MAYA  |                1,000 MAYA.CACAO
+20 | PROVIDER-1 to VAULT  | ADD:KUJI.KUJI:PROVIDER-1                                          | KUJI  |                1,500 KUJI.KUJI
+21 | PROVIDER-1 to VAULT  | ADD:KUJI.USK:PROVIDER-1                                           | MAYA  |                1,000 MAYA.CACAO
+22 | PROVIDER-1 to VAULT  | ADD:KUJI.USK:PROVIDER-1                                           | KUJI  |                1,500 KUJI.USK
+23 | PROVIDER-1 to VAULT  | ADD:DASH.DASH:PROVIDER-1                                          | MAYA  |                3,000 MAYA.CACAO
+24 | PROVIDER-1 to VAULT  | ADD:DASH.DASH:PROVIDER-1                                          | DASH  |                  350 DASH.DASH
+25 | PROVIDER-1 to VAULT  | ADD:XRD.XRD:PROVIDER-1                                            | MAYA  |                1,000 MAYA.CACAO
+26 | PROVIDER-1 to VAULT  | ADD:XRD.XRD:PROVIDER-1                                            | XRD   |                1,000 XRD.XRD
+27 | USER-1 to VAULT      | SWAP:MAYA.CACAO:USER-1                                            | XRD   |                1,000 XRD.XRD
+28 | USER-1 to VAULT      | SWAP:XRD.XRD:USER-1                                               | MAYA  |                1,000 MAYA.CACAO
+29 | PROVIDER-1 to VAULT  | WITHDRAW:XRD.XRD:1000                                             | MAYA  |           0.00000001 MAYA.CACAO
+30 | PROVIDER-1 to VAULT  | WITHDRAW:XRD.XRD                                                  | MAYA  |           0.00000001 MAYA.CACAO
+31 | PROVIDER-1 to VAULT  | ADD:THOR.RUNE:PROVIDER-1                                          | MAYA  |                1,000 MAYA.CACAO
+32 | PROVIDER-1 to VAULT  | ADD:THOR.RUNE:PROVIDER-1                                          | THOR  |                  200 THOR.RUNE
+33 | USER-1 to VAULT      | SWAP:THOR.RUNE:USER-1                                             | MAYA  |                1,000 MAYA.CACAO
+34 | USER-1 to VAULT      | SWAP:MAYA.CACAO:USER-1                                            | THOR  |                   10 THOR.RUNE
+35 | PROVIDER-1 to VAULT  | ADD:BTC.BTC:PROVIDER-1                                            | MAYA  |              100,000 MAYA.CACAO
+36 | PROVIDER-1 to VAULT  | ADD:BTC.BTC:PROVIDER-1                                            | BTC   |                  2.5 BTC.BTC
+37 | PROVIDER-1 to VAULT  | SWAP:BTC/BTC:PROVIDER-1                                           | MAYA  |               10,000 MAYA.CACAO
+38 | PROVIDER-1 to VAULT  | SWAP:BTC.BTC:PROVIDER-1                                           | MAYA  |                  0.1 BTC/BTC
+39 | PROVIDER-1 to VAULT  | SWAP:BTC.BTC:PROVIDER-1-SYNTH                                     | MAYA  |                  0.1 BTC/BTC
+40 | PROVIDER-1 to VAULT  | SWAP:BTC/BTC:PROVIDER-1-SYNTH                                     | MAYA  |                  0.1 BTC/BTC
+41 | PROVIDER-1 to VAULT  | ADD:ETH.ETH:PROVIDER-1                                            | MAYA  |               50,000 MAYA.CACAO
+42 | PROVIDER-1 to VAULT  | ADD:ETH.ETH:PROVIDER-1                                            | ETH   |        2,000,000,000 ETH.ETH
+43 | PROVIDER-1 to VAULT  | ADD:ARB.ETH:PROVIDER-1                                            | MAYA  |               50,000 MAYA.CACAO
+44 | PROVIDER-1 to VAULT  | ADD:ARB.ETH:PROVIDER-1                                            | ARB   |        2,000,000,000 ARB.ETH
+45 | PROVIDER-1 to VAULT  | ADD:ETH.TKN-0X52C84043CD9C865236F11D9FC9F56AA003C1F922:PROVIDER-1 | MAYA  |               50,000 MAYA.CACAO
+46 | PROVIDER-1 to VAULT  | ADD:ETH.TKN-0X52C84043CD9C865236F11D9FC9F56AA003C1F922:PROVIDER-1 | ETH   |       40,000,000,000 ETH.TKN-0X52C84043CD9C865236F11D9FC9F56AA003C1F922
+47 | PROVIDER-2 to VAULT  | ADD:MAYA.CACAO                                                    | MAYA  |               50,000 MAYA.CACAO
+48 | USER-1 to VAULT      |                                                                   | MAYA  |                  200 MAYA.CACAO
+49 | USER-1 to VAULT      | ABDG?                                                             | MAYA  |                  200 MAYA.CACAO
+50 | USER-1 to VAULT      | SWAP:MAYA.CACAO:USER-1                                            | BTC   |                0.018 BTC.BTC
+51 | USER-1 to VAULT      | SWAP:MAYA.CACAO:USER-1                                            | KUJI  |                  100 KUJI.KUJI
+52 | USER-1 to VAULT      | SWAP:MAYA.CACAO:USER-1                                            | KUJI  |                  100 KUJI.USK
+53 | USER-1 to VAULT      | SWAP:MAYA.CACAO:USER-1                                            | DASH  |                   10 DASH.DASH
+54 | USER-1 to VAULT      | SWAP:MAYA.CACAO:USER-1                                            | THOR  |                   10 THOR.RUNE
+55 | USER-1 to VAULT      | SWAP:ETH.ETH:USER-1                                               | MAYA  |               50,000 MAYA.CACAO
+56 | USER-1 to VAULT      | SWAP:MAYA.CACAO:USER-1                                            | ETH   |        1,500,000,000 ETH.ETH
+57 | USER-1 to VAULT      | SWAP:ARB.ETH:USER-1                                               | MAYA  |               50,000 MAYA.CACAO
+58 | USER-1 to VAULT      | SWAP:MAYA.CACAO:USER-1                                            | ARB   |        1,500,000,000 ARB.ETH
+59 | USER-1 to VAULT      | SWAP:ETH.TKN-0X52C84043CD9C865236F11D9FC9F56AA003C1F922:USER-1    | MAYA  |               50,000 MAYA.CACAO
+60 | USER-1 to VAULT      | SWAP:MAYA.CACAO:USER-1                                            | ETH   |        1,500,000,000 ETH.TKN-0X52C84043CD9C865236F11D9FC9F56AA003C1F922
+61 | PROVIDER-1 to VAULT  | WITHDRAW:ETH.ETH:1000                                             | MAYA  |           0.00000001 MAYA.CACAO
+62 | PROVIDER-1 to VAULT  | WITHDRAW:ARB.ETH:1000                                             | MAYA  |           0.00000001 MAYA.CACAO
+63 | PROVIDER-1 to VAULT  | WITHDRAW:ETH.TKN-0X52C84043CD9C865236F11D9FC9F56AA003C1F922:1000  | MAYA  |           0.00000001 MAYA.CACAO
+64 | PROVIDER-1 to VAULT  | WITHDRAW:BTC.BTC:1000                                             | MAYA  |           0.00000001 MAYA.CACAO
+65 | PROVIDER-1 to VAULT  | WITHDRAW:DASH.DASH:1000                                           | MAYA  |           0.00000001 MAYA.CACAO
+66 | PROVIDER-1 to VAULT  | WITHDRAW:THOR.RUNE:1000                                           | MAYA  |           0.00000001 MAYA.CACAO
+67 | PROVIDER-1 to VAULT  | WITHDRAW:KUJI.KUJI:1000                                           | MAYA  |           0.00000001 MAYA.CACAO
+68 | PROVIDER-1 to VAULT  | WITHDRAW:KUJI.USK:1000                                            | MAYA  |           0.00000001 MAYA.CACAO
+69 | PROVIDER-1 to VAULT  | WITHDRAW:ETH.TKN-0X52C84043CD9C865236F11D9FC9F56AA003C1F922       | MAYA  |           0.00000001 MAYA.CACAO
+70 | PROVIDER-1 to VAULT  | WITHDRAW:ETH.ETH                                                  | MAYA  |           0.00000001 MAYA.CACAO
+71 | PROVIDER-1 to VAULT  | WITHDRAW:ARB.ETH                                                  | MAYA  |           0.00000001 MAYA.CACAO
+72 | PROVIDER-1 to VAULT  | SWAP:MAYA.CACAO:PROVIDER-1                                        | MAYA  |           0.02206199 BTC/BTC
+73 | PROVIDER-1 to VAULT  | WITHDRAW:BTC.BTC                                                  | MAYA  |           0.00000001 MAYA.CACAO
+74 | PROVIDER-1 to VAULT  | WITHDRAW:DASH.DASH                                                | MAYA  |           0.00000001 MAYA.CACAO
+75 | PROVIDER-1 to VAULT  | WITHDRAW:KUJI.USK                                                 | MAYA  |           0.00000001 MAYA.CACAO
+76 | PROVIDER-1 to VAULT  | WITHDRAW:KUJI.KUJI                                                | MAYA  |           0.00000001 MAYA.CACAO
+77 | PROVIDER-1 to VAULT  | WITHDRAW:THOR.RUNE                                                | MAYA  |           0.00000001 MAYA.CACAO
+```
+
+Question: do I have to comment out the other chains in python or can I just
+reduce the txs json?
+
+These are the events distilled. I've tried to group them as best as I can:
+
+```
+pending_liquidity  | KUJI.KUJI | 1,000 CACAO | 0 KUJI.KUJI
+pool               | KUJI.KUJI | Available
+add_liquidity      | KUJI.KUJI | 1,000 CACAO | 1,500 KUJI.KUJI
+rewards            | 0
+
+pending_liquidity  | KUJI.USK | 1,000 CACAO | 0 KUJI.USK
+rewards            | 0
+pool               | KUJI.USK | Available
+add_liquidity      | KUJI.USK | 1,000 CACAO | 1,500 KUJI.USK
+rewards            | 0
+
+pending_liquidity  | DASH.DASH | 3,000 CACAO | 0 DASH.DASH
+rewards            | 0
+pool               | DASH.DASH | Available
+add_liquidity      | DASH.DASH | 3,000 CACAO | 350 DASH.DASH
+rewards            | 0
+
+pending_liquidity  | XRD.XRD | 1,000 CACAO | 0 XRD.XRD
+rewards            | 0
+pool               | XRD.XRD | Available
+add_liquidity      | XRD.XRD | 1,000 CACAO | 1,000 XRD.XRD
+rewards            | 0
+
+swap               | 1,000 XRD.XRD | MAYA.CACAO
+fee                | 20 MAYA.CACAO
+
+swap               | 1,000 MAYA.CACAO | XRD.XRD
+fee                | 0.0004 XRD.XRD
+gas                | XRD.XRD | 0.62782808 XRD.XRD | 0 MAYA.CACAO
+
+withdraw           | WITHDRAW:XRD.XRD:1000
+fee                | 0.0004 XRD.XRD
+fee                | 20 MAYA.CACAO
+gas                | XRD.XRD | 0.62782808 XRD.XRD | 0 MAYA.CACAO
+pool               | XRD.XRD | Staged
+
+withdraw           | WITHDRAW:XRD.XRD
+fee                | 20 MAYA.CACAO
+gas                | XRD.XRD | 0.62782928 XRD.XRD | 0 MAYA.CACAO
+
+pending_liquidity  | THOR.RUNE | 1,000 CACAO | 0 THOR.RUNE
+pool               | THOR.RUNE | Available
+add_liquidity      | THOR.RUNE | 1,000 CACAO | 200 THOR.RUNE
+
+swap               | 1,000 MAYA.CACAO | THOR.RUNE
+fee                | 0.0004 THOR.RUNE
+gas                | THOR.RUNE | 0 THOR.RUNE | 0 MAYA.CACAO
+
+swap               | 10 THOR.RUNE | MAYA.CACAO
+fee                | 20 MAYA.CACAO
+
+pending_liquidity  | BTC.BTC | 100,000 CACAO | 0 BTC.BTC
+add_liquidity      | BTC.BTC | 100,000 CACAO | 2.5 BTC.BTC
+
+swap               | 10,000 MAYA.CACAO | BTC/BTC
+fee                | 0.00045455 BTC/BTC
+
+swap               | 0.1 BTC/BTC | BTC.BTC
+outbound           | MAYA | 4,228.37383451 MAYA.CACAO
+
+swap               | 4,228.37383451 MAYA.CACAO | BTC.BTC
+fee                | 0.0002 BTC.BTC
+gas                | BTC.BTC | 0.00015 BTC.BTC | 0 MAYA.CACAO
+fee                | 0.00043784 BTC/BTC
+refund             | 0.1 BTC/BTC | [code 105] swap destination address is not the same chain as the target asset: unknown request
+fee                | 0.00043792 BTC/BTC
+refund             | 0.1 BTC/BTC | [code 105] swap Source and Target cannot be the same.: unknown request
+
+pending_liquidity  | ETH.ETH | 50,000 CACAO | 0 ETH.ETH
+pool               | ETH.ETH | Available
+add_liquidity      | ETH.ETH | 50,000 CACAO | 0.2 ETH.ETH
+
+pending_liquidity  | ARB.ETH | 50,000 CACAO | 0 ARB.ETH
+pool               | ARB.ETH | Available
+add_liquidity      | ARB.ETH | 50,000 CACAO | 0.2 ARB.ETH
+
+pending_liquidity  | ETH.TKN-0X52C84043CD9C865236F11D9FC9F56AA003C1F922 | 50,000 CACAO | 0 ETH.TKN-0X52C84043CD9C865236F11D9FC9F56AA003C1F922
+pool               | ETH.TKN-0X52C84043CD9C865236F11D9FC9F56AA003C1F922 | Available
+add_liquidity      | ETH.TKN-0X52C84043CD9C865236F11D9FC9F56AA003C1F922 | 50,000 CACAO | 4 ETH.TKN-0X52C84043CD9C865236F11D9FC9F56AA003C1F922
+
+fee                | 20 MAYA.CACAO
+refund             | 50,000 MAYA.CACAO | [code 105] asset cannot be cacao: unknown request
+fee                | 20 MAYA.CACAO
+refund             | 200 MAYA.CACAO | [code 105] invalid tx type:  
+fee                | 20 MAYA.CACAO
+refund             | 200 MAYA.CACAO | [code 105] invalid tx type: ABDG?
+
+swap               | 0.018 BTC.BTC | MAYA.CACAO
+fee                | 20 MAYA.CACAO
+
+swap               | 100 KUJI.KUJI | MAYA.CACAO
+fee                | 20 MAYA.CACAO
+
+swap               | 100 KUJI.USK | MAYA.CACAO
+fee                | 20 MAYA.CACAO
+
+swap               | 10 DASH.DASH | MAYA.CACAO
+fee                | 20 MAYA.CACAO
+
+swap               | 10 THOR.RUNE | MAYA.CACAO
+fee                | 20 MAYA.CACAO
+
+swap               | 50,000 MAYA.CACAO | ETH.ETH
+fee                | 0.0013 ETH.ETH
+gas                | ETH.ETH | 0.00119436 ETH.ETH | 0 MAYA.CACAO
+
+swap               | 0.15 ETH.ETH | MAYA.CACAO
+fee                | 20 MAYA.CACAO
+
+swap               | 50,000 MAYA.CACAO | ARB.ETH
+fee                | 0.00000399 ARB.ETH
+gas                | ARB.ETH | 0.0000044 ARB.ETH | 0 MAYA.CACAO
+
+swap               | 0.15 ARB.ETH | MAYA.CACAO
+fee                | 20 MAYA.CACAO
+
+swap               | 50,000 MAYA.CACAO | ETH.TKN-0X52C84043CD9C865236F11D9FC9F56AA003C1F922
+fee                | 0.00972007 ETH.TKN-0X52C84043CD9C865236F11D9FC9F56AA003C1F922
+gas                | ETH.ETH | 0.06291456 ETH.ETH | 0 MAYA.CACAO
+
+swap               | 0.15 ETH.TKN-0X52C84043CD9C865236F11D9FC9F56AA003C1F922 | MAYA.CACAO
+fee                | 20 MAYA.CACAO
+
+withdraw           | WITHDRAW:ETH.ETH:1000
+fee                | 0.0013 ETH.ETH
+fee                | 20 MAYA.CACAO
+gas                | ETH.ETH | 0.00119508 ETH.ETH | 0 MAYA.CACAO
+
+withdraw           | WITHDRAW:ARB.ETH:1000
+fee                | 0.000004 ARB.ETH
+fee                | 20 MAYA.CACAO
+gas                | ARB.ETH | 0.0000044 ARB.ETH | 0 MAYA.CACAO
+
+withdraw           | WITHDRAW:ETH.TKN-0X52C84043CD9C865236F11D9FC9F56AA003C1F922:1000
+fee                | 0.01647933 ETH.TKN-0X52C84043CD9C865236F11D9FC9F56AA003C1F922
+fee                | 20 MAYA.CACAO
+gas                | ETH.ETH | 0.06291456 ETH.ETH | 0 MAYA.CACAO
+
+withdraw           | WITHDRAW:BTC.BTC:1000
+fee                | 0.0002 BTC.BTC
+fee                | 20 MAYA.CACAO
+gas                | BTC.BTC | 0.00015 BTC.BTC | 0 MAYA.CACAO
+
+withdraw           | WITHDRAW:DASH.DASH:1000
+fee                | 0.0002 DASH.DASH
+fee                | 20 MAYA.CACAO
+gas                | DASH.DASH | 0.00015 DASH.DASH | 0 MAYA.CACAO
+
+withdraw           | WITHDRAW:THOR.RUNE:1000
+fee                | 0.0004 THOR.RUNE
+fee                | 20 MAYA.CACAO
+gas                | THOR.RUNE | 0 THOR.RUNE | 0 MAYA.CACAO
+
+withdraw           | WITHDRAW:KUJI.KUJI:1000
+fee                | 0.0004 KUJI.KUJI
+fee                | 20 MAYA.CACAO
+gas                | KUJI.KUJI | 0 KUJI.KUJI | 0 MAYA.CACAO
+
+withdraw           | WITHDRAW:KUJI.USK:1000
+fee                | 0.0004 KUJI.USK
+fee                | 20 MAYA.CACAO
+gas                | KUJI.KUJI | 0 KUJI.KUJI | 0 MAYA.CACAO
+pool               | ETH.TKN-0X52C84043CD9C865236F11D9FC9F56AA003C1F922 | Staged
+
+withdraw           | WITHDRAW:ETH.TKN-0X52C84043CD9C865236F11D9FC9F56AA003C1F922
+fee                | 20 MAYA.CACAO
+gas                | ETH.ETH | 0.06291456 ETH.ETH | 0 MAYA.CACAO
+pool               | ETH.ETH | Staged
+
+withdraw           | WITHDRAW:ETH.ETH
+fee                | 20 MAYA.CACAO
+gas                | ETH.ETH | 0.00119544 ETH.ETH | 0 MAYA.CACAO
+pool               | ARB.ETH | Staged
+
+withdraw           | WITHDRAW:ARB.ETH
+fee                | 20 MAYA.CACAO
+gas                | ARB.ETH | 0.0000044 ARB.ETH | 0 MAYA.CACAO
+
+swap               | 0.02206199 BTC/BTC | MAYA.CACAO
+fee                | 20 MAYA.CACAO
+
+withdraw           | WITHDRAW:BTC.BTC
+fee                | 0.0002 BTC.BTC
+fee                | 20 MAYA.CACAO
+gas                | BTC.BTC | 0.00015 BTC.BTC | 0 MAYA.CACAO
+
+pool               | DASH.DASH | Staged
+withdraw           | WITHDRAW:DASH.DASH
+fee                | 20 MAYA.CACAO
+gas                | DASH.DASH | 0.00015 DASH.DASH | 0 MAYA.CACAO
+
+pool               | KUJI.USK | Staged
+withdraw           | WITHDRAW:KUJI.USK
+fee                | 20 MAYA.CACAO
+gas                | KUJI.KUJI | 0 KUJI.KUJI | 0 MAYA.CACAO
+
+pool               | KUJI.KUJI | Staged
+withdraw           | WITHDRAW:KUJI.KUJI
+fee                | 20 MAYA.CACAO
+gas                | KUJI.KUJI | 0 KUJI.KUJI | 0 MAYA.CACAO
+
+pool               | THOR.RUNE | Staged
+withdraw           | WITHDRAW:THOR.RUNE
+fee                | 20 MAYA.CACAO
+gas                | THOR.RUNE | 0 THOR.RUNE | 0 MAYA.CACAO
+```
+
+Questions:
+- why is `btc.btc` sometimes written `btc/btc`?
+- why/how is `btc/btc` being sent on the `maya` chain? (tx 38/39/40)
+- why is there a single `outbound` event?
+- why are there are 2 `fee`s close to a `withdraw` event but sometimes only 1?
+
+I created a few scripts to output the above, as well as a tx filter to avoid
+manual errors, and so I can get a familiar structure despite the smoke test
+configuration.
+
+```
+./_scripts/format-smoke-txs.mjs
+./_scripts/format-smoke-events.mjs
+
+./_scripts/filter-smoke-txs.mjs MAYA.CACAO DASH.DASH
+```
+
+Unfortunately, the python import statement in mayachain.py causes some
+side-effect loading which tries to connect to a thornode. That's a code smell.
+In an ideal world these tests would work with whatever is in the txs json,
+creating connections only as needed. Instead I have to dive into the code and
+get heavy handed with commenting out lines 😢
+
+
+#### 07.11.2024 Thursday 3h
+
+not changing anything:
+
+> Exception: Bad chain Dash balance: VAULT simulated: 324.00002980 DASH.DASH, mock: 324.00001804 DASH.DASH
+
+trying to change the withdraw size to account for the difference:
+
+2980 - 1804 = 1176
+1176 / 8 = 147
+
+278 + 147 = 425
+
+> out coins not matching 3599993096 DASH.DASH != 3599994860 DASH.DASH
+
+which one comes first?
+
+run -> sim_catch_up (causes out coins not matching)
+run -> check_chain (causes Bad chain Dash balance)
+
+sim_catch_up is called first.
+
+The sim is calculating the fee to be 2160 DASH
+It's actually 3336 DASH, because of the new memo OUT:...
+3336 - 2160 = 1176
+
+The fee difference is the same as the expected balance difference. I know what I
+need to change. I just need to understand the smoke test code enough to apply it.
+
+receive MsgDeposit coins=[{"amount":"1","asset":"MAYA.CACAO"}] from=tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw memo=WITHDRAW:DASH.DASH:1000
+receive MsgWithdrawLiquidity withdraw address=tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw withdraw basis points=1000
+pool before withdraw balance RUNE=291666666668 balance asset=36000000000 pool units=300000000000
+liquidity provider before withdraw liquidity provider unit=300000000000
+imp loss calculation deposit value=583564814816 protection=0 redeem value=583333333336
+client withdraw RUNE=29166666667 asset=3600000000 units left=270000000000
+pool after withdraw balance RUNE=262500000001 balance asset=32400000000 pool unit=270000000000
+
+Received a TxOut Array of {31 [{DASH yXdzzagQPwWXdZzFD2vRmsYMxgeD6o9D2L tmayapub1addwnpepqvzm4zkz7yndfcqu9nvatnzrxlrf2yvjsj4gweqm2w5ds4wncp3vcdrwjx6 3599992784 DASH.DASH OUT:814C81BFEF7C1609060566DB7F9D08CE6D7E8506A9FDC6BBEEFD55DC9D82F396 [5412 DASH.DASH] 12 814C81BFEF7C1609060566DB7F9D08CE6D7E8506A9FDC6BBEEFD55DC9D82F396    <nil>}]} from the Thorchain module=signer service=bifrost
+Signing transaction height=31 module=signer num=0 service=bifrost status=1 tx={"aggregator":"","chain":"DASH","coins":[{"amount":"3599992784","asset":"DASH.DASH"}],"gas_rate":12,"in_hash":"814C81BFEF7C1609060566DB7F9D08CE6D7E8506A9FDC6BBEEFD55DC9D82F396","max_gas":[{"amount":"5412","asset":"DASH.DASH","decimals":8}],"memo":"OUT:814C81BFEF7C1609060566DB7F9D08CE6D7E8506A9FDC6BBEEFD55DC9D82F396","out_hash":"","to":"yXdzzagQPwWXdZzFD2vRmsYMxgeD6o9D2L","vault_pubkey":"tmayapub1addwnpepqvzm4zkz7yndfcqu9nvatnzrxlrf2yvjsj4gweqm2w5ds4wncp3vcdrwjx6"}
+max gas is: [5412 DASH.DASH], however only: 3336 is required, gap: 2076 goes to customer module=dash service=bifrost
+total: 36000000000, to customer: 3599994860, gas: 3336 module=dash service=bifrost
+send 32400001804 back to self module=dash service=bifrost
+UTXOs to sign: 2 module=dash service=bifrost
+final size: 452, final vbyte: 452 module=dash service=bifrost
+broadcast to DASH chain successfully hash=e297b00290393134cf29aa96c7168b4a6a321233633efe083a7b4a62d62980a7 module=dash service=bifrost
+
+I[2024-11-08 00:57:59,350]  6 PROVIDER-1 => VAULT      [WITHDRAW:DASH.DASH:1000] 0.00000001 MAYA.CACAO
+#!# @transfer tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw => tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6 [WITHDRAW:DASH.DASH:1000] 0.00000001 MAYA.CACAO | Gas 20.00000000 MAYA.CACAO | ID 814C81BFEF7C1609060566DB7F9D08CE6D7E8506A9FDC6BBEEFD55DC9D82F396
+#!# --> gas set, using that value
+#!# --> [<Coin 20.00000000 MAYA.CACAO>]
+#!# @sim_catch_up
+#!# @sim_trigger_tx
+#!# @get_gas | DASH | tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw => tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6 [WITHDRAW:DASH.DASH:1000] 0.00000001 MAYA.CACAO | Gas 20.00000000 MAYA.CACAO | ID 814C81BFEF7C1609060566DB7F9D08CE6D7E8506A9FDC6BBEEFD55DC9D82F396
+#!# @_calculate_gas
+#!# --> tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw => tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6 [WITHDRAW:DASH.DASH:1000] 0.00000001 MAYA.CACAO | Gas 20.00000000 MAYA.CACAO | ID 814C81BFEF7C1609060566DB7F9D08CE6D7E8506A9FDC6BBEEFD55DC9D82F396
+#!# --> dash_amount 1800
+#!# handle_withdraw 0.00001800 DASH.DASH
+#!# @get_gas | MAYA | tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw => tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6 [WITHDRAW:DASH.DASH:1000] 0.00000001 MAYA.CACAO | Gas 20.00000000 MAYA.CACAO | ID 814C81BFEF7C1609060566DB7F9D08CE6D7E8506A9FDC6BBEEFD55DC9D82F396
+#!# @handle_fee
+#!# --> asset_fee  7216
+#!# --> self.network_fees[DASH]  3608
+#!# --> tx [<Coin 35.99992784 DASH.DASH>]
+#!# --> tx.max_gas  [<Coin 0.00005412 DASH.DASH>]
+#!# --> dash_max_gas  0.00003336 DASH.DASH
+#!# --> gap  2076
+#!# --> appendfee 7216 DASH.DASH
+#!# --> tx.fee 0.00007216 DASH.DASH
+#!# @transfer yQnuNWBqpTpACNLszGF6jJ4RBTHFjAPgsp => yXdzzagQPwWXdZzFD2vRmsYMxgeD6o9D2L [OUT:814C81BFEF7C1609060566DB7F9D08CE6D7E8506A9FDC6BBEEFD55DC9D82F396] 35.99994860 DASH.DASH | Gas 0.00001800 DASH.DASH | Fee 0.00007216 DASH.DASH
+#!# --> gas set, using that value
+#!# --> [<Coin 0.00001800 DASH.DASH>]
+#!# @transfer tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6 => tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw [OUT:814C81BFEF7C1609060566DB7F9D08CE6D7E8506A9FDC6BBEEFD55DC9D82F396] 271.66666667 MAYA.CACAO | Gas 20.00000000 MAYA.CACAO | Fee 20.00000000 MAYA.CACAO
+#!# --> gas set, using that value
+#!# --> [<Coin 20.00000000 MAYA.CACAO>]
+
+Sweet jesus that did it.
+
+#### 15.11.2024 Friday 6h
+
+Switching over to ADA only smoke test.  
+Applied the same changes as I did with the dash-only working smoke test into `adc-smoke-adaonly`  
+Merged develop back into `add-cardano-chain` and resolve conflicts  
+Rechecking unit tests  
+
+Trying to clean up the `make test` output by supressing all these duplicated PITA warnings:
+
+```
+make test 2>&1 | ggrep -v "ignoring duplicate libraries\|no test"
+```
+
+```
+make test                                                                                                                                                                       ~/go/src/gitlab.com/mayachain/mayanode
+# github.com/alexdcox/cardano-go
+../../../../pkg/mod/github.com/alexdcox/cardano-go@v0.1.3/util.go:25:7: assignment mismatch: 1 variable but scalar.SetBytesWithClamping returns 2 values
+FAIL  gitlab.com/mayachain/mayanode/common [build failed]
+FAIL
+make: *** [Makefile:170: test-network-specific] Error 1
+```
+
+filippo.io/edwards25519
+mine: v1.1.0
+maya: v1.1.0
+
+> github.com/fxamacker/cbor/v2: github.com/fxamacker/cbor/v2@v2.7.0: replacement directory ./cbor does not exist
+
+Guess I need to actually push my cbor repo changes.
+
+The commit is: `Support decoding cbor maps with non string or binary keys`
+
+`go get github.com/alexdcox/cbor/v2@v2.0.0`
+
+Improve cbor handling, update tx submit rpc, change index start point, add dockerfile
+- Added dockerfile to build cardano container with rpc binary preinstalled
+- Switched cbor package from fxmacker to alexdcox to support decoding cbor maps with struct keys
+- Allowed for setting cbor tags in a byte-exact match with the cardano protocol
+- Removed limit on first conway block for the tx index
+- Updated to the conway transaction submit cli format
+
+Pushed that to v0.1.7.
+
+`go get github.com/alexdcox/cardano-go@v0.1.7`
+
+Getting a load of missing go.sum entries when running `make test`
+
+```
+../../../../pkg/mod/github.com/huin/goupnp@v1.3.0/httpu/multiclient.go:7:2: missing go.sum entry for module providing package golang.org/x/sync/errgroup (imported by gitlab.com/mayachain/mayanode/bifrost/pkg/chainclients/bitcoin); to add:
+  go get gitlab.com/mayachain/mayanode/bifrost/pkg/chainclients/bitcoin
+bifrost/pkg/chainclients/bitcoin/client.go:27:2: missing go.sum entry for module providing package golang.org/x/sync/semaphore (imported by gitlab.com/mayachain/mayanode/bifrost/pkg/chainclients/bitcoin); to add:
+  go get gitlab.com/mayachain/mayanode/bifrost/pkg/chainclients/bitcoin
+```
+
+```
+bifrost/pkg/chainclients/cardano/client.go:387:12: cannot use inputs (variable of type []"github.com/alexdcox/cardano-go".TransactionInput) as "github.com/alexdcox/cardano-go".WithCborTag[[]"github.com/alexdcox/cardano-go".TransactionInput] value in struct literal
+bifrost/pkg/chainclients/cardano/client.go:408:32: cannot use &cardano.AuxData{…} (value of type *"github.com/alexdcox/cardano-go".AuxData) as "github.com/alexdcox/cardano-go".WithCborTag[any] value in assignment
+bifrost/pkg/chainclients/cardano/client.go:926:12: cannot use fakeInputs (variable of type []"github.com/alexdcox/cardano-go".TransactionInput) as "github.com/alexdcox/cardano-go".WithCborTag[[]"github.com/alexdcox/cardano-go".TransactionInput] value in struct literal
+bifrost/pkg/chainclients/cardano/client.go:947:32: cannot use &cardano.AuxData{…} (value of type *"github.com/alexdcox/cardano-go".AuxData) as "github.com/alexdcox/cardano-go".WithCborTag[any] value in assignment
+```
+
+```
+bifrost/pkg/chainclients/loadchains.go:47:11: cannot use cardano.NewClient(thorKeys, chain, server, mayachainBridge, m) (value of type *"gitlab.com/mayachain/mayanode/bifrost/pkg/chainclients/cardano".Client) as ChainClient value in return statement: *"gitlab.com/mayachain/mayanode/bifrost/pkg/chainclients/cardano".Client does not implement ChainClient (wrong type for method SignTx)
+    have SignTx("gitlab.com/mayachain/mayanode/bifrost/mayaclient/types".TxOutItem, int64) ([]byte, []byte, error)
+    want SignTx("gitlab.com/mayachain/mayanode/bifrost/mayaclient/types".TxOutItem, int64) ([]byte, []byte, *"gitlab.com/mayachain/mayanode/bifrost/mayaclient/types".TxInItem, error)
+```
+
+The `SignTx` interface func of `ChainClient` now returns an array of `TxInItem`.  
+That's quite a significant change, why?  
+The commit just says: `Update EVM client to latest Part 1`  
+It added an `Observer` to the bifrost `Signer`.  
+`ObserveSigned` was only added at the start of this month, so I'm guessing it is
+relevant to tss.  
+
+I'll start by just updating my client to match the new interface signature.
+
+> create the observation to be sent by the signer before broadcast
+
+> Also Observe Real Transaction for EVM Instant-Observe Outbounds
+
+Ahaa Itzamna saves the day with this link:  
+https://gitlab.com/thorchain/thornode/-/issues/1559
+
+Which introduces these changes:
+https://gitlab.com/thorchain/thornode/-/merge_requests/2964/diffs
+
+So it's to avoid an issue where txs are not observed in heavy load. Instead of
+just the signer knowing about it until the block is eventually observed by
+other nodes, they send a BROADCAST message so the other nodes know to expect
+it.
+
+Added that to cardano.
+
+> FTL app/config/config.go:346 > chain failed validation error="chain id len is less than 3" chain=ADA chain_id= service=bifrost
+
+Okay it's going to be very slow if I have to rebuild the mayanode docker
+container each time I want to run this, but... can I actually build it on my
+machine?
+
+```
+Undefined symbols for architecture arm64:
+  "_ffi_radix_engine_toolkit_uniffi_rustbuffer_free", referenced from:
+```
+
+```
+CGO_LDFLAGS="-L$(pwd)/lib -lradix_engine_toolkit_uniffi_arm64" \
+go build ./cmd/mayanode/
+```
+
+I need the rust engine shared object / dll file included in the mayanode project
+seems to be compiled for amd64 and not arm.
+
+Maybe I can add an arm64 variant?
+
+Quite an important comment here `build/docker/Dockerfile:13` relating to the
+radix engine toolkit and how it's built in maya for alpine.
+
+I'd rather have the script that compiles that included with the .so file rather
+than that explanation - both would be better still.
+
+`libradix_engine_toolkit_uniffi.so`  
+
+```
+git clone git@github.com:radixdlt/babylon-node.git
+docker build  . \
+    -t radixdlt/babylon-node:local-test-core-rust \
+    --target library-container \
+    --output ./outputs
+```
+
+Yep, the official example showing how to build the shared library doesn't work
+for me.
+
+```
+docker run --rm -it -v $(pwd):/mnt -w /mnt debian
+
+apt update && apt upgrade -y
+apt install -y musl-gcc musl-tools
+
+
+```
+
+#### 19.11.2024 Monday 6h
+
+Right so on to getting radix built locally so I can run the docker compose setup
+against my break-stoppable maya/bifrost local binaries.
+
+`go build ./cmd/mayanode`
+
+```
+Undefined symbols for architecture arm64:
+  "_ffi_radix_engine_toolkit_uniffi_rustbuffer_free", referenced from:
+```
+
+etc...
+
+```
+git clone https://github.com/radixdlt/radix-engine-toolkit.git
+cd radix-engine-toolkit
+rustup target add aarch64-apple-darwin
+cargo build --target aarch64-apple-darwin --release
+mv ./target/aarch64-apple-darwin/release/libradix_engine_toolkit.dylib ~/go/src/gitlab.com/mayachain/mayanode/lib/libradix_engine_toolkit_uniffi_arm64.dylib
+```
+
+Oh you can also just download the release directly instead of building from source:
+
+```
+wget https://github.com/radixdlt/radix-engine-toolkit-go/releases/download/v2.2.0-dev11/libradix_engine_toolkit_uniffi_aarch64_apple_darwin.tar.gz
+tar -xvf ./libradix_engine_toolkit_uniffi_aarch64_apple_darwin.tar.gz
+mv radix-engine-toolkit-uniffi-aarch64-apple-darwin/libradix_engine_toolkit_uniffi.dylib ~/go/src/gitlab.com/mayachain/mayanode/lib/libradix_engine_toolkit_unifii_arm64.dylib
+```
+
+```
+CGO_LDFLAGS="-L$(pwd)/lib_arm -lradix_engine_toolkit_uniffi" \
+CGO_ENABLED=1  \
+DYLD_LIBRARY_PATH="$(pwd)/lib_arm" \
+go build ./cmd/mayanode 2>&1 | ggrep -v "\-Wdeprecated-declarations\|explicitly marked deprecated\|ignoring duplicate libraries"
+```
+
+```
+nm -gU ./lib/libradix_engine_toolkit_uniffi_arm64.dylib
+nm -gU ./lib/libradix_engine_toolkit_uniffi.dylib
+```
+
+The version I built didn't have any symbols for some reason, so I just used the
+official release.
+
+Same error.
+
+It's looking for `_uniffi_radix_engine_toolkit_uniffi_checksum_constructor_accessrule_require_virtual_signature`
+
+Deffo not in there. What version?
+
+```
+otool -L ./lib/libradix_engine_toolkit_uniffi_arm64.dylib
+otool -L ./lib/libradix_engine_toolkit_uniffi.dylib
+```
+
+Version metadata not set. Simple search of `radix` within `mayanode` shows
+version `2.1.1` in the github import as well as in some docker files.
+
+```
+wget https://github.com/radixdlt/radix-engine-toolkit-go/releases/download/v2.1.1/libradix_engine_toolkit_uniffi_aarch64_apple_darwin.tar.gz
+tar -xvf ./libradix_engine_toolkit_uniffi_aarch64_apple_darwin.tar.gz
+mv radix-engine-toolkit-uniffi-aarch64-apple-darwin/libradix_engine_toolkit_uniffi.dylib ~/go/src/gitlab.com/mayachain/mayanode/lib/libradix_engine_toolkit_uniffi_arm64.dylib
+```
+
+```
+nm -gU ./lib/libradix_engine_toolkit_uniffi_arm64.dylib | grep virtual
+```
+
+Better. Now we apparently don't have: `_uniffi_radix_engine_toolkit_uniffi_checksum_constructor_nonfungibleglobalid_global_caller_badge`
+
+```
+nm -gU ./lib/libradix_engine_toolkit_uniffi_arm64.dylib | grep caller_badge
+nm -gU ./lib/libradix_engine_toolkit_uniffi.dylib | grep caller_badge
+nm -D ./lib/libradix_engine_toolkit_uniffi.so | grep caller_badge
+```
+
+wtf. none of them have that. why do I need it?
+
+```
+Undefined symbols for architecture arm64:
+  "_uniffi_radix_engine_toolkit_uniffi_checksum_constructor_nonfungibleglobalid_global_caller_badge", referenced from:
+      __cgo_9972220eda9b_Cfunc_uniffi_radix_engine_toolkit_uniffi_checksum_constructor_nonfungibleglobalid_global_caller_badge in 000006.o
+```
+
+```
+docker run -it -v $(pwd):/mnt -w /mnt golang:bookworm
+```
+
+Oops forgot we're on Alpine.
+
+```
+docker run -it -v $(pwd):/mnt -w /mnt registry.gitlab.com/mayachain/mayanode:builder-v6
+```
+
+```
+CGO_LDFLAGS="-L$(pwd)/lib -lradix_engine_toolkit_uniffi" \
+CGO_ENABLED=1 \
+LD_LIBRARY_PATH="$(pwd)/lib" \
+go build ./cmd/mayanode
+```
+
+Same issue in alpine using the official maya build continer with the shared object
+file commited with the project. Uhh...
+
+```
+/usr/local/go/pkg/tool/linux_amd64/link: running gcc failed: exit status 1
+/usr/bin/ld: /tmp/go-link-329163671/000024.o: in function `_cgo_9972220eda9b_Cfunc_uniffi_radix_engine_toolkit_uniffi_checksum_constructor_nonfungibleglobalid_global_caller_badge':
+/tmp/go-build/radix_engine_toolkit_uniffi.cgo2.c:714: undefined reference to `uniffi_radix_engine_toolkit_uniffi_checksum_constructor_nonfungibleglobalid_global_caller_badge'
+```
+
+Just confirmed I get the same issue with `make build-mocknet`. What in the name
+of sweet buttermilk jesus is going on here.
+
+Ahh for some reason my version was 2.1.2 not 2.1.1. Maybe a go tidy messed it up.
+
+```
+LD_LIBRARY_PATH="$(pwd)/lib" ./mayanode
+otool -L ./mayanode
+
+DYLD_LIBRARY_PATH="$(pwd)/lib" ./mayanode
+```
+
+Need to remember to switch `LD_...` for `DYLD_...` on osx.
+
+Brilliant, setting these env vars in golang work for me on osx:
+
+```
+CGO_ENABLED=1
+CGO_LDFLAGS=-L/Users/adc/go/src/gitlab.com/mayachain/mayanode/lib -lradix_engine_toolkit_uniffi
+DYLD_LIBRARY_PATH1=/Users/adc/go/src/gitlab.com/mayachain/mayanode/lib
+```
+
+With gotool args:
+
+```
+--tags mocknet -ldflags "-X gitlab.com/mayachain/mayanode/constants.Version=1.112.0 -X gitlab.com/mayachain/mayanode/constants.GitCommit=7ccebe02a -X gitlab.com/mayachain/mayanode/constants.BuildTime=2024-01-01_00:00:00 -X github.com/cosmos/cosmos-sdk/version.Name=MAYAChain -X github.com/cosmos/cosmos-sdk/version.AppName=mayanode -X github.com/cosmos/cosmos-sdk/version.Version=1.112.0 -X github.com/cosmos/cosmos-sdk/version.Commit=7ccebe02a -X github.com/cosmos/cosmos-sdk/version.BuildTags=mocknet"
+```
+
+```
+CGO_ENABLED=1;
+CGO_LDFLAGS=-L/Users/adc/go/src/gitlab.com/mayachain/mayanode/lib -lradix_engine_toolkit_uniffi;
+DYLD_LIBRARY_PATH1=/Users/adc/go/src/gitlab.com/mayachain/mayanode/lib;
+NET=mocknet;
+CHAIN_ID=mayachain;
+CHAIN_API: 127.0.0.1:1317;
+CHAIN_RPC: 127.0.0.1:26657;
+SIGNER_NAME=mayachain;
+SIGNER_PASSWD=mayachain;
+SIGNER_DB_PATH="/Users/adc/.mayanode";
+KUJI_DISABLED=true;
+ETH_DISABLED=true;
+GAIA_DISABLED=true;
+BNB_DISABLED=true;
+BTC_DISABLED=true;
+DASH_DISABLED=true;
+XRD_DISABLED=true;
+THOR_DISABLED=true;
+AVAX_DISABLED=true;
+ARB_DISABLED=true;
+ADA_DISABLED=false;
+CHAIN_API=127.0.0.1:1317;
+CHAIN_RPC=127.0.0.1:26657;
+MAYANODE_SERVICE_PORT_RPC=26657;
+AVAX_HOST=http://127.0.0.1:9650/ext/bc/C/rpc;
+BINANCE_HOST=http://127.0.0.1:26660;
+BTC_HOST=127.0.0.1:18443;
+DASH_HOST=127.0.0.1:19898;
+ETH_HOST=http://127.0.0.1:8545;
+ARB_HOST=http://127.0.0.1:8547;
+XRD_HOST=http://127.0.0.1:3333/core;
+GAIA_HOST=http://127.0.0.1:26657;
+GAIA_GRPC_HOST=127.0.0.1:9090;
+GAIA_GRPC_TLS=false;
+KUJI_HOST=http://127.0.0.1:26657;
+KUJI_GRPC_HOST=127.0.0.1:9090;
+KUJI_GRPC_TLS=false;
+ADA_HOST=http://127.0.0.1:3631;
+THOR_API=thorchain:1317;
+THOR_HOST=http://127.0.0.1:26657;
+THOR_GRPC_HOST=127.0.0.1:9090;
+THOR_GRPC_TLS=false;
+THOR_BLOCK_TIME=5s;
+BLOCK_SCANNER_BACKOFF=5s;
+BIFROST_METRICS_PPROF_ENABLED=true;
+BIFROST_SIGNER_BACKUP_KEYSHARES=true;
+BIFROST_SIGNER_AUTO_OBSERVE=false;
+BIFROST_SIGNER_KEYGEN_TIMEOUT=30s;
+BIFROST_SIGNER_KEYSIGN_TIMEOUT=30s;
+CARDANO_BLOCK_PRODUCER=true;
+
+MAYA_TENDERMINT_INSTRUMENTATION_PROMETHEUS=false;
+MAYA_COSMOS_API_ADDRESS=tcp://0.0.0.0:1317;
+MAYA_TENDERMINT_RPC_LISTEN_ADDRESS=tcp://0.0.0.0:26657;
+MAYA_TENDERMINT_P2P_LISTEN_ADDRESS=tcp://0.0.0.0:27000;
+CREATE_BLOCK_PORT=" + strconv.Itoa(8080+routine),
+```
+
+By default maya just runs at the user home dir:
+
+```
+rm -rf ~/.mayanode
+```
+
+Back to the bifrost with IDE debugging.
+
+`SUPPORT_CHAINS_` for mainnet/stagenet/mocknet all needed ADA.
+
+`bifrost.signer.signer_db_path` `SIGNER_DB_PATH` was previously not configurable?
+
+Argh I'm just going to edit the default.yaml for now there's not a way to
+override the default observer db path for every chain.
+
+> fail to create gas manager: bad version
+
+Sorted. The api isn't running for some reason?
+
+`CHAIN_API` is correct
+
+Gima asked for all changes to be pushed so here we go:
+- [x] worklog
+- [x] cbor
+- [x] mayanode
+  - [x] add-cardano-chain
+  - [x] adc-smoke-adaonly
+- [x] cardano-go
 
 
