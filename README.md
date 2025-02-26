@@ -7502,7 +7502,7 @@ replace (
 06.11.2024 Wednesday   6h 30m
 07.11.2024 Thursday    3h
 15.11.2024 Friday      6h
-19.11.2024 Monday      6h
+18.11.2024 Monday      6h
 
 Total                 89h 30m
 ```
@@ -10968,7 +10968,7 @@ apt install -y musl-gcc musl-tools
 
 ```
 
-#### 19.11.2024 Monday 6h
+#### 18.11.2024 Monday 6h
 
 Right so on to getting radix built locally so I can run the docker compose setup
 against my break-stoppable maya/bifrost local binaries.
@@ -11194,5 +11194,2665 @@ Gima asked for all changes to be pushed so here we go:
   - [x] add-cardano-chain
   - [x] adc-smoke-adaonly
 - [x] cardano-go
+
+
+### Batch Four
+
+```
+TODO: hours breakdown
+```
+
+#### 19.11.2024 Tuesday 8h 30m
+
+Just a quick thought from yesterday, unless the disk io is for drastically
+different purposes across disparate places of a program or with major
+read/write requirements, we should really just be asking for a single root
+directory and then manage everything within that. We have directory config for
+every single chain when it could simply be: `./root/observer/{ada,dash,btc}` etc.
+Just adds unnecessary complexity and begs the question, why has this been done?
+Am I missing something? - In this case, I don't think I am.
+
+Oh well I'm not here to fix that back to the fastest path to imlementation...
+
+I now have mayanode and bifrost running locally through my IDE so I can step
+debug and make rapid adjustments. At least I could if it was running happily -
+which it isn't. So I'll start there.
+
+> Error: failed to initialize database: resource temporarily unavailable
+
+> ERR x/mayachain/manager_store_common.go:99 > fail to send manual refund error="invalid Bech32 prefix; expected tmaya, got maya" address=maya1gyap83aenguyhce3a0y3gprap32ypuc99vtzlc
+
+There's a load of hardcoded `failedSwaps` in the chaosnet store that's somehow
+being triggered despite running on mocknet? Or are we not on mocknet?
+
+maya1gyap83aenguyhce3a0y3gprap32ypuc99vtzlc  
+migrateStoreV104  
+migrateStoreV105  
+migrateStoreV109  
+
+No we want to build with both `mocknet` and `regtest` go flags.
+
+> permission denied","path":"/var/data/bifrost/observer"
+
+Find the 2 config vars starting with `/var/data` in `default.yaml` and replace.  
+I used `/Users/adc/.mayanode`.
+
+Even on the working smoke test makefile setup we see some alarming logs:
+
+```
+ERR app/x/mayachain/manager_store_chaosnet.go:1321 > fail to parse address: %s
+ERR app/x/mayachain/manager_store_chaosnet.go:1325 > fail to send provider reward: %s
+ERR app/x/mayachain/manager_store_common.go:269 > fail to parse address: %s
+ERR app/x/mayachain/manager_store_chaosnet.go:2083 > failed to parse origin address error="invalid Bech32 prefix; expected tmaya, got maya"
+ERR app/x/mayachain/manager_gas_current.go:238 > network fee is invalid error="transaction size can't be zero or negative: 0" chain=THOR
+ERR app/x/mayachain/manager_txout_current.go:648 > fail to get vault error="vault with pubkey(mayapub1addwnpepqw0anseu8gqs52equc5phn980d78p2c8q7t2pwl92eg4lflr92hmu9xl2za) doesn't exist: vault not found"
+```
+
+The we get `executed block height=2` and the localhost:1317 chain api becomes
+available.
+
+My last log line is `Reserve Module`.
+
+```
+INF go/pkg/mod/github.com/tendermint/tendermint@v0.34.21/node/node.go:338 > Version info block=11 p2p=8 tendermint_version=0.34.21
+INF go/pkg/mod/github.com/tendermint/tendermint@v0.34.21/libs/service/service.go:139 > service start impl=Node msg={}
+INF go/pkg/mod/github.com/tendermint/tendermint@v0.34.21/node/node.go:897 > Starting pprof server laddr=localhost:6060
+INF go/pkg/mod/github.com/tendermint/tendermint@v0.34.21/libs/service/service.go:139 > service start impl=BlockchainReactor module=blockchain msg={}
+INF go/pkg/mod/github.com/tendermint/tendermint@v0.34.21/libs/service/service.go:139 > service start impl=StateSync module=statesync msg={}
+```
+
+Okay I take it back, we don't want the `regtest` flag.
+
+```
+cat ~/.mayanode/config/app.toml | grep -B 3 -A 3 'enable ='
+```
+
+I was missing a crucial step: `mayanode render-config`.
+
+Finally, an error I WANT to see:
+
+> {"level":"error","service":"bifrost","module":"bifrost","error":"Get \"http://localhost:3631/status\":
+  dial tcp [::1]:3631: connect: connection
+  refused","chain":"ADA","time":"05:11:07","caller":"/Users/adc/go/src/gitlab.com/mayachain/mayanode/bifrost/pkg/chainclients/loadchains.go:93","message":"failed
+  to load chain"}
+
+That means the bifrost is attempting to connect to the cardano rpc.
+
+
+```bash
+while true; do
+  docker compose \
+    --profile mocknet \
+    --profile midgard \
+    up \
+      --scale kuji=0 \
+      --scale ethereum=0 \
+      --scale gaia=0 \
+      --scale bitcoin=0 \
+      --scale radix=0 \
+      --scale dash1=0 \
+      --scale dash2=0 \
+      --scale dash3=0 \
+      --scale dash4=0 \
+      --scale thorchain=0 \
+      --scale mayanode=0 \
+      --scale bifrost=0 \
+      --scale avalanche=0 \
+      --scale arbitrum=0 \
+      --scale binance=0 \
+      --scale cardano=1 \
+      --remove-orphans \
+      --detach
+  echo -n "Press enter to STOP mayanode cluster..."
+  read ignored
+
+  docker compose \
+    --profile mocknet \
+    --profile midgard \
+    down \
+      --volumes
+  echo -n "Press enter to RESTART mayanode cluster..."
+  read ignored
+done
+```
+
+https://ogmios.dev/
+
+Only just found this. It supports passthrough.
+
+Might want to try replacing my n2n protocol with apollo now...
+
+```
+./gouroboros -address localhost:3001 -network-magic 42 -ntn chain-sync
+```
+
+github.com/blinklabs-io/gouroboros  
+I like the code, but it's incomplete. No build tx?
+
+For some reason my golang debugger isn't able to read an interface type.
+
+Outdated delve?
+
+```
+go install github.com/go-delve/delve/cmd/dlv@latest
+```
+
+```
+dlv debug ./_cli/proxy_decode
+break /Users/adc/code/cardano-go/message.go:319
+continue
+args
+```
+
+Works fine. There's a goland update...
+
+Further investigating gouroboros...
+
+#### 27.11.2024 Wednesday 4h
+
+Right let's get a smoke run dash only working with the scripts again.
+
+```bash
+gco adc-smoke-dashonly
+cd build/docker
+while true; do
+  docker compose \
+    --profile mocknet \
+    --profile midgard \
+    up \
+      --scale kuji=0 \
+      --scale ethereum=0 \
+      --scale gaia=0 \
+      --scale bitcoin=0 \
+      --scale radix=0 \
+      --scale dash1=1 \
+      --scale dash2=1 \
+      --scale dash3=1 \
+      --scale dash4=1 \
+      --scale thorchain=0 \
+      --scale avalanche=0 \
+      --scale arbitrum=0 \
+      --scale binance=0 \
+      --remove-orphans \
+      --detach
+  echo -n "Press enter to STOP mayanode cluster..."
+  read ignored
+
+  docker compose \
+    --profile mocknet \
+    --profile midgard \
+    down \
+      --volumes
+  echo -n "Press enter to RESTART mayanode cluster..."
+  read ignored
+done
+
+docker run \
+  --network host \
+  --name smoke \
+  --rm \
+  --entrypoint bash \
+  -it \
+  -e RUNE=MAYA.CACAO
+  -e LOGLEVEL=INFO \
+  -e PYTHONPATH=/app \
+  -e BLOCK_SCANNER_BACKOFF=5s \
+  -w /app \
+  -v $(pwd):/app \
+    registry.gitlab.com/mayachain/mayanode:smoke
+python scripts/smoke.py --fast-fail=True
+```
+
+That's strange, never seen that error before. It did the first 3 smoke
+transactions and then started failing to fetch `/accounts`.
+
+Oh for the dash smokeonly I still had a bit of BNB python being hit even though
+it's not mentioned at all in transactions json.
+
+> Bad chain Dash balance: USER-1 simulated: 40.00000000 DASH.DASH, mock: 0.00000000 DASH.DASH
+
+Perhaps I started the test too soon. Second attempt and we're past it.
+
+Ok nice, clean run. Now to achieve the same with goland in debug mode.
+
+```bash
+while true; do
+  docker compose \
+    --profile mocknet \
+    --profile midgard \
+    up \
+      --scale mayanode=0 \
+      --scale bifrost=0 \
+      --scale kuji=0 \
+      --scale ethereum=0 \
+      --scale gaia=0 \
+      --scale bitcoin=0 \
+      --scale radix=0 \
+      --scale dash1=1 \
+      --scale dash2=1 \
+      --scale dash3=1 \
+      --scale dash4=1 \
+      --scale thorchain=0 \
+      --scale avalanche=0 \
+      --scale arbitrum=0 \
+      --scale binance=0 \
+      --remove-orphans \
+      --detach
+  echo -n "Press enter to STOP mayanode cluster..."
+  read ignored
+
+  docker compose \
+    --profile mocknet \
+    --profile midgard \
+    down \
+      --volumes
+  echo -n "Press enter to RESTART mayanode cluster..."
+  read ignored
+done
+```
+
+```
+./_scripts/mocknet/genesis.sh
+```
+
+> permission denied","path":"/var/data/bifrost/observer"
+
+Already addressed this in the cardano-only branch.
+
+> fail to create thorchain scan storage: Signer passphrase very weak, change either length or complexity by adding special characters, numbers, lower and/or uppercase letters
+
+I assume it means mayanode. Here's the entropy calculation:
+
+$$
+\begin{array}{rcl}
+\text{where:} & & \\
+S & = & \text{number of unique symbols} \\
+L & = & \text{length of string} \\
+\text{entropy} & = & \log_2(S^L)
+\end{array}
+$$
+
+I want easy to remember and barely over the 50 minimum.
+
+```
+mayanode       37.603518
+mayachain      42.303957
+mAyacha1n      53.587767
+password       37.603518
+mayachain_     58.579810
+password_      52.721829
+```
+
+Might have to go into the `smoke.py` and switch all the `localhost` for 
+`host.docker.internal` when I'm running on my machine (as opposed to a docker
+container)
+
+Yusss. Clean smoke run, maya/bifrost compiled and running on my dev machine,
+nodes running with the typical make cluster. That's going to make for much
+faster iteration.
+
+Now back to cardano. `gco adc-smoke-adaonly`  
+Actually let me merge develop and try one more time...  
+Perfect now to cardano. Merging develop...  
+
+> fail to get address for chain: fail to encode the address, err: expected a 32 length ed25519 private key, got 20 bytes
+
+Right. The cosmos bech32 address is the first 20 bytes of the sha256 hash of the
+public key. Passing the wrong thing there.
+
+We're trying to get the inbound address using bech32 encoded secp256k1 public
+keys.
+
+Might have to get a bit heavy handed here changing the way mayanode
+fundamentally uses public keys.
+
+For verifying if a public key is on a curve:
+- secp256k1 - `secp256k1_ec_pubkey_parse` in `libsecp256k1`
+- ed25519 - `crypto_sign_verify_detached` in `libsodium`
+
+#### 28.11.2024 Thursday 1h
+
+First order of the day. Why is `PubKey::GetAddress` being called for ADA with
+a secp256k1 key? That shouldn't happen. It should always be ed25519.
+
+I think the problem is, the asgard vault has a single public key, which is
+secp256k1.
+
+Damn, might need to just spend some time readinging the code thoroughly here...
+
+Observations:
+- `common.PubKeySet` - contains both keys
+- `types.NodeAccount` - uses PubKeySet, so nodes have both keys already
+
+On another note, I'm seeing that vaults only currently support secp256k1. I was
+of the understanding I'd just be implementing cardano, not modifying the core
+protocol of maya. Is there some branch where vaults have both key types? Is
+there someone with better understanding of the key protocol on this? Or shall I
+tackle this one? It's a bit out of the scope of my project but hell if we need
+it done then so be it...
+
+#### 03.01.2025 Friday 6h
+
+Coming back to this after being away for December.
+
+First thing's first, locate the vault/ed25519 work...
+
+Pulling latest from mayanode...  
+
+Give me ALL THE UPDATES. Goland, iterm, os, bios, mouse driver, monitor
+firmware, just messing.
+
+Have some uncommited changes on my `adc-smoke-adaonly` branch. Adding a WIP
+commit for now.
+
+`Updating 4854a33a0..2b7f52f53` Around 35 new commits.  
+
+Think this is the section in `type_vault.proto`:
+
+```protobuf
+message Vault {
+  ...
+  string pub_key = 2 [(gogoproto.casttype) = "gitlab.com/mayachain/mayanode/common.PubKey"];
+  ...
+}
+```
+
+It just has a singly `pub_key` secp256k1 key string. So no room for ed25519?  
+
+That's where I was expecting to see a change? Perhaps I misunderstand.
+
+Why is there ed25519 logic and yet the vaults don't support ed25519 keys?  
+What are we actually using those keys for?
+
+To recap: Tendermint validators use ed25519 keys for block signing and proposals,
+and secp256k1 keys for transactions and accounts, partly because of convention.
+
+Coffee time.
+
+Where are the private keys stored too? Will I have to make changes all the way
+down at the tendermint level to achieve this??
+
+We need a valid ADA/Cardano address returned in `queryInboundAddresses`.
+
+Okay the inbound_addresses input is now returning this helpful error:
+
+> fail to get address for chain: fail to encode the address, expected *ed25519.PubKey, got *secp256k1.PubKey"
+
+That's coming directly from `queryInboundAddresses` here:
+
+```golang
+vaultAddress, err = vault.PubKey.GetAddress(chain)
+```
+
+So where is that `vault.PubKey` set?
+
+From this `NewVault` function at `type_vault.go`. Here's the function signature:
+
+```goland
+func NewVault(height int64, status VaultStatus, vtype VaultType, pk common.PubKey, chains []string, routers []ChainContract) Vault
+```
+
+And that's called in `manager_network_current.go` `processGenesisSetup` which may
+handle my use case for a new private network. What about for an already
+established mainnet?
+
+Time for another recap: Asgard vaults are longer term storage for large sums, and
+Yggdrasil vaults contain funds handled by validators to facilitate actual
+transactions. Asgard uses TSS, Yggdrasil uses validator keys. The protocol aims
+to maintain a maximum of 2 Asgard vaults, one new, one retiring, which happens
+during a churn. If the churn takes too long it is possible to have 3 vaults but
+again, the protocol tries to avoid this. Yggrasil/validator keys rotate after
+they're forced to LEAVE, as you can't rejoin with the same key.
+
+In this case, the actual vault creation for Cardano would be triggered during
+the next Asgard vault migration cycle.
+
+Rereading `docs/chains/README.md`...
+
+These are the non-test files which call `NewVault`:
+
+```
+find . -type f -name "*.go" ! -name "*_test.go" -exec grep -l " NewVault(" {} \; | sort
+```
+
+```
+./openapi/gen/model_vault.go
+./x/mayachain/handler_tss.go
+./x/mayachain/manager_network_current.go
+./x/mayachain/manager_network_v102.go
+./x/mayachain/manager_network_v107.go
+./x/mayachain/manager_network_v108.go
+./x/mayachain/manager_network_v96.go
+./x/mayachain/manager_yggdrasil_current.go
+./x/mayachain/types/test_common.go
+./x/mayachain/types/type_vault.go
+```
+
+`model_vault.go` and `test_common.go` I think can be safely ignored.  
+Don't think I need to worry about older network versions.  
+That leaves me with:
+
+```
+./x/mayachain/handler_tss.go
+./x/mayachain/manager_network_current.go
+./x/mayachain/manager_yggdrasil_current.go
+```
+
+Aaluxx said I might be able to take some things from TC.
+
+Doing the same find as above on thorchain:develop.
+
+```
+./openapi/gen/model_vault.go
+./x/thorchain/handler_tss.go
+./x/thorchain/manager_network_current.go
+./x/thorchain/types/test_common.go
+./x/thorchain/types/type_vault.go
+```
+
+Interesting, they've cleaned away all the older network versions.
+
+Seeing this in `manager_network_current` specifying secp256k1 but there IS
+ed25519 on the `PubKeySet`:
+
+```goland
+vault := NewVault(0, ActiveVault, AsgardVault, active[0].PubKeySet.Secp256k1, supportChains.Strings(), vm.k.GetChainContracts(ctx, supportChains))
+```
+
+Maybe we can just pass the entire PubKeySet to NewVault instead of just the
+Secp256k1 key?
+
+What about looking for commits accross all branches to the vault in the last few
+months?
+
+```
+git log --all --since="2 months ago" -- x/thorchain/types/type_vault.go
+git log --all --since="5 months ago" --pretty=format:"%h - %an, %ar : %s" -- x/thorchain/types/type_vault.go
+```
+
+```
+41df5f8de - Beorn 9R, 4 weeks ago : Squashed commit from `sol-rc` containing:
+0e9d801dc - Andrew Gouin, 6 weeks ago : v3 module path #check-lint-warning
+```
+
+What branch is that?  
+`git branch -a --contains 41df5f8de`  
+`git checkout beorn/sol-geyser`  
+
+I see on Dec 4th containing "add ED25519 support for regtest" on branch
+`beorn/sol-geyser` from Beorn at Nine Realms.
+
+```
+git diff 41df5f8ded85bbad3384eae2f22120c5a77f5602~1..41df5f8ded85bbad3384eae2f22120c5a77f5602 -- x/thorchain/types/type_vault.go
+```
+
+Ahaa. We have a `Vault` `PubKeyEddsa` field.
+
+```
+git diff --shortstat develop..beorn/sol-geyser
+# 425 files changed, 110006 insertions(+), 8349 deletions(-)
+```
+
+He's got pretty far. If not past the finish line.
+
+```
+* 050057194 - (HEAD -> beorn/sol-geyser, origin/beorn/sol-geyser) Add geyser plugin for Solana (3 weeks ago) <Beorn 9R>
+* 2bfee847a - Fix pub key and base58 tests (4 weeks ago) <Beorn 9R>
+* c2384eeec - Rebase cleanup (4 weeks ago) <Beorn 9R>
+* 41df5f8de - Squashed commit from `sol-rc` containing: (4 weeks ago) <Beorn 9R>
+* ebd23037a - [mocknet] Reduce Init Contention for Mocknet Cluster (4 weeks ago) <Beorn 9R>
+```
+
+He's added it as another field to the `Vault` message, that's what we want:
+
+```golang
+message Vault {
+  ...
+  string pub_key = 2 [(gogoproto.casttype) = "gitlab.com/thorchain/thornode/v3/common.PubKey"];
+  ...
+  string pub_key_eddsa = 24 [(gogoproto.casttype) = "gitlab.com/thorchain/thornode/v3/common.PubKey", (gogoproto.nullable) = true];
+}
+```
+
+Do I just bring in all those changes into maya? Yeaaaa let's do it! Got the go
+ahead as well.
+
+I'll just bring the eddsa stuff, hopefully easy to bring across and easy to
+merge back into develop.
+
+Right, merging develop back onto add-cardano-chain first. They removed gaia.
+
+x/thorchain  
+x/mayachain
+
+add-cardano-chain  
+thorchain/beorn/sol-geyser
+
+```
+git log --oneline origin/develop..thorchain/develop --reverse | head -n 1
+git log --oneline origin/develop..thorchain/develop --reverse | head -n 1
+```
+
+Right going to read through the diff first and get a mental grip on what I need
+to do here.
+
+- cmd/bifrost/health_test - KeygenAllAlgo and other ECDSA stuff
+- cmd/constants - might need EDPath
+- common/chain - need to update GetSigningAlgo
+- common/pubkey_mainnet_test - missing test case
+- common/pubkey_test - missing test case, there's KeyTestPubAddrED25519 at the bottom
+- common/tx - might need a length case statement for the different cardano address strings
+- openapi/gen/api/openapi.yaml - has eddsa properties
+- openapi/gen/docs/ObservedTx.md - add ObservedPubKeyEddsa
+- openapi/gen/docs/TxOutItem.md
+- openapi/gen/docs/Vault.md
+- openapi/gen/docs/VaultInfo.md
+- openapi/gen/docs/model_observed_tx.go
+- openapi/gen/docs/model_tx_out_item.go
+- openapi/gen/docs/model_vault.go
+- openapi/gen/docs/model_vault_info.go
+- openapi/gen/docs/openapi.yaml - might need a version bump here, no bc breaks though just a minor ver. also has eddsa changes
+- proto/.../chain/v1/types/msg_tss_pool.proto - pool_pub_key_eddsa
+- proto/.../chain/v1/types/query_vault.proto - pub_key_eddsa
+- proto/.../chain/v1/types/type_observed_tx.proto - observed_pub_key_eddsa
+- proto/.../chain/v1/types/type_tss.proto - pool_pub_key_eddsa
+- proto/.../chain/v1/types/type_vault.proto - pub_key_eddsa
+- test/fixtures/endpoints/vaults/pubKeys.json
+- test/regression/cmd/config.go
+- test/regression/cmd/operations.go - PoolPubKeyEddsa, NewMsgTssPoolV2 notice the v2
+- test/regression/mnt/blocks/api/quotes/swap.json - MsgObservedTxIn|Out
+- test/regression/mnt/blocks/core/memo.json - same as above
+- test/regression/mnt/blocks/core/outbound-fee.json - might be renamed "send" in maya
+- test/regression/mnt/blocks/core/vault-frozen.json
+- test/regression/mnt/blocks/api/blocks/eddsa/eddsa.json - entirely new file
+- test/regression/mnt/blocks/errata-tx/errata-tx.json
+- test/regression/mnt/blocks/* - there are so many of the same change in blocks I'm going to stop here, just go through each file
+- test/regression/mnt/exports/core/initialize.json - might have missed adding ADA to the vault list here
+- test/regression/mnt/exports/core/send.json - might have missed adding ADA to the vault list here
+- test/regression/mnt/exports/deposit/deposit.json - same as above 2, just check all "vaults.chains" for ADA in exports
+- test/regression/mnt/exports/eddsa/eddsa.json - git says they moved it from ../tor/asset-tor-price.json, which we don't have??
+- test/regression/suites/core/initialize.yaml - maybe another one I missed for ADA
+- test/regression/suites/eddsa/eddsa.yaml - new file
+- test/regression/templates/btc-ada-pool-state.yaml - might need to create this
+- x/.../keeper/v1/alias.go - NewVaultV2
+- x/.../keeper/v1/keeper.go - prefixVaultAsgardEDDSAIndex
+- x/.../keeper/v1/keeper_vault.go - vault.GetAddress
+- x/.../keeper/v1/keeper_vault_test.go
+- x/.../types/msg_tss_pool_v2.go
+- x/.../types/test_common.go
+- x/.../types/type_tss.go
+- x/.../types/type_tss_test.go - NewTssVoter func sig change
+- x/.../types/type_vault.go
+- x/.../types/type_vault_v2.go
+- x/.../types/type_vault_v2_test.go
+- x/.../alias.go - NewMsgTssPoolV2, NewVaultV2
+- x/.../handler_outbound_tx_test.go
+- x/.../handler_tss.go
+- x/.../handler_tss_keysign.go - this one needs careful attention. on first glace it seems like a redundant redeclaration of the vault, but it does pass a pubkey
+- x/.../handler_tss_test.go
+- x/.../manager_network_current.go - just a getaddress change?
+- x/.../manager_txout_current.go
+- x/.../querier.go - There's a "revert this" todo still in here
+- x/.../querier_quotes.go
+- x/.../querier_test.go
+- x/.../thorchain_test.go - this one hasn't been renamed to mayachain_test? regardless, needs NewMsgTssPoolV2
+
+Observations:
+
+• This `SignModes` keep cropping up but I think it's more to do with a cosmos update
+  than anything eddsa specific.
+
+• I didn't add a shortcode for cardano/ada because "a" is assigned to ARB.ETH and
+  "c" is assigned to MAYA.CACAO.
+
+• Need to confirm cardano chain values in common/chain.
+
+• The regression folder has so many places where it adds eddsa pubkeys and where
+  cardano might need to be added to the vaults.chains array.
+
+• Thorchain have addressed the smoke test debacle by adding test/simulation! 😇
+  Unfortunately it's not part of mayanode yet, but that'll be a MASSIVE time
+  saver for new chain implementations.
+
+• Need to make sure to rerun the protoc and commit those changes.
+
+• "author" was F&R'd to "aumaya" in regtest readme. There's also "unaumayaized"
+  in ban.yaml :p
+
+• There's a `make openapi` command in the main `Makefile`. Probably should
+  double-check them after all these additions.
+
+• When proto messages I need to update will have different field numbers to
+  thorchain, should I just include the fields I don't need with the assumption
+  we'll most likely merge those in from TC in future? For example. `MsgTssPool`
+  on maya has 10 fields. Thorchain adds field 11:secp256k1signature along with
+  the field I need, 12:poolpubkeyeddsa. Guess it'll come up in the MR anyway
+  I'll just add both.
+
+#### 20.01.2025 Monday 1h 30m
+
+Onwards with this port. Double checking for recent commits on `thorchain/beorn/sol-geyser`.
+
+Found 1 extra commit, ver bump 1 week ago.
+
+Alright going through the list:
+
+- [x] cmd/bifrost/health_test - KeygenAllAlgo and other ECDSA stuff
+- [x] cmd/constants - might need EDPath
+- [x] common/chain - need to update GetSigningAlgo
+- [ ] common/pubkey_mainnet_test - missing test case
+- [ ] common/pubkey_test - missing test case, there's KeyTestPubAddrED25519 at the bottom
+- [ ] common/tx - might need a length case statement for the different cardano address strings
+- [ ] openapi/gen/api/openapi.yaml - has eddsa properties
+- [ ] openapi/gen/docs/ObservedTx.md - add ObservedPubKeyEddsa
+- [ ] openapi/gen/docs/TxOutItem.md
+- [ ] openapi/gen/docs/Vault.md
+- [ ] openapi/gen/docs/VaultInfo.md
+- [ ] openapi/gen/docs/model_observed_tx.go
+- [ ] openapi/gen/docs/model_tx_out_item.go
+- [ ] openapi/gen/docs/model_vault.go
+- [ ] openapi/gen/docs/model_vault_info.go
+- [ ] openapi/gen/docs/openapi.yaml - might need a version bump here, no bc breaks though just a minor ver. also has eddsa changes
+- [ ] proto/.../chain/v1/types/msg_tss_pool.proto - pool_pub_key_eddsa
+- [ ] proto/.../chain/v1/types/query_vault.proto - pub_key_eddsa
+- [ ] proto/.../chain/v1/types/type_observed_tx.proto - observed_pub_key_eddsa
+- [ ] proto/.../chain/v1/types/type_tss.proto - pool_pub_key_eddsa
+- [ ] proto/.../chain/v1/types/type_vault.proto - pub_key_eddsa
+- [ ] test/fixtures/endpoints/vaults/pubKeys.json
+- [ ] test/regression/cmd/config.go
+- [ ] test/regression/cmd/operations.go - PoolPubKeyEddsa, NewMsgTssPoolV2 notice the v2
+- [ ] test/regression/mnt/blocks/api/quotes/swap.json - MsgObservedTxIn|Out
+- [ ] test/regression/mnt/blocks/core/memo.json - same as above
+- [ ] test/regression/mnt/blocks/core/outbound-fee.json - might be renamed "send" in maya
+- [ ] test/regression/mnt/blocks/core/vault-frozen.json
+- [ ] test/regression/mnt/blocks/api/blocks/eddsa/eddsa.json - entirely new file
+- [ ] test/regression/mnt/blocks/errata-tx/errata-tx.json
+- [ ] test/regression/mnt/blocks/* - there are so many of the same change in blocks I'm going to stop here, just go through each file
+- [ ] test/regression/mnt/exports/core/initialize.json - might have missed adding ADA to the vault list here
+- [ ] test/regression/mnt/exports/core/send.json - might have missed adding ADA to the vault list here
+- [ ] test/regression/mnt/exports/deposit/deposit.json - same as above 2, just check all "vaults.chains" for ADA in exports
+- [ ] test/regression/mnt/exports/eddsa/eddsa.json - git says they moved it from ../tor/asset-tor-price.json, which we don't have??
+- [ ] test/regression/suites/core/initialize.yaml - maybe another one I missed for ADA
+- [ ] test/regression/suites/eddsa/eddsa.yaml - new file
+- [ ] test/regression/templates/btc-ada-pool-state.yaml - might need to create this
+- [ ] x/.../keeper/v1/alias.go - NewVaultV2
+- [ ] x/.../keeper/v1/keeper.go - prefixVaultAsgardEDDSAIndex
+- [ ] x/.../keeper/v1/keeper_vault.go - vault.GetAddress
+- [ ] x/.../keeper/v1/keeper_vault_test.go
+- [ ] x/.../types/msg_tss_pool_v2.go
+- [ ] x/.../types/test_common.go
+- [ ] x/.../types/type_tss.go
+- [ ] x/.../types/type_tss_test.go - NewTssVoter func sig change
+- [ ] x/.../types/type_vault.go
+- [ ] x/.../types/type_vault_v2.go
+- [ ] x/.../types/type_vault_v2_test.go
+- [ ] x/.../alias.go - NewMsgTssPoolV2, NewVaultV2
+- [ ] x/.../handler_outbound_tx_test.go
+- [ ] x/.../handler_tss.go
+- [ ] x/.../handler_tss_keysign.go - this one needs careful attention. on first glace it seems like a redundant redeclaration of the vault, but it does pass a pubkey
+- [ ] x/.../handler_tss_test.go
+- [ ] x/.../manager_network_current.go - just a getaddress change?
+- [ ] x/.../manager_txout_current.go
+- [ ] x/.../querier.go - There's a "revert this" todo still in here
+- [ ] x/.../querier_quotes.go
+- [ ] x/.../querier_test.go
+- [ ] x/.../thorchain_test.go - this one hasn't been renamed to mayachain_test? regardless, needs NewMsgTssPoolV2
+
+Observations:
+
+• They've replaced `github.com/99designs/keyring` with `github.com/cosmos/keyring`.
+  Do we want to do this? I'll stop looking at the go.mod file for now - can of worms.
+
+• Thorchain have brought go-tss into the project at `bifrost/tss/go-tss`  
+  Seems wrong, or like a temporary workaround before the project gets updated?  
+  I'll do the same for now.
+
+  F&R in `bifrost/tss/go-tss`:
+  
+  ```
+  gitlab.com/thorchain/thornode/v3
+  gitlab.com/mayachain/mayanode
+  ```
+  
+  F&R in project:
+  
+  ```
+  gitlab.com/thorchain/tss/go-tss
+  gitlab.com/mayachain/mayanode/bifrost/tss/go-tss
+  ```
+
+  ```
+  make test-go-tss
+  make test-go-tss 2>&1 | ggrep -v "ignoring duplicate libraries\|no test"
+  ```
+
+  > FAIL: tss_4nodes_test.go:107: FourNodeTestSuite.Test4NodesTss
+  
+  Tests failing. What about on the Thornode project?  
+  Same issue. 😐  
+
+  ```
+  FAIL: tss_4nodes_test.go:107: FourNodeTestSuite.Test4NodesTss
+
+  result:map[1:{PubKey: PoolAddress: Status:2 Blame:reason:signers fail to sync before keygen/keysign is_unicast:false
+  round:
+  nodes:[{Pubkey:thorpub1addwnpepqtdklw8tf3anjz7nn5fly3uvq2e67w2apn560s4smmrt9e3x52nt2svmmu3 BlameData:[] BlameSignature:[]}]
+  } 2:{PubKey: PoolAddress: Status:2 Blame:reason:signers fail to sync before keygen/keysign is_unicast:false
+  round:
+  nodes:[{Pubkey:thorpub1addwnpepqtdklw8tf3anjz7nn5fly3uvq2e67w2apn560s4smmrt9e3x52nt2svmmu3 BlameData:[] BlameSignature:[]}]
+  } 3:{PubKey: PoolAddress: Status:2 Blame:reason:signers fail to sync before keygen/keysign is_unicast:false
+  round:
+  nodes:[{Pubkey:thorpub1addwnpepqtdklw8tf3anjz7nn5fly3uvq2e67w2apn560s4smmrt9e3x52nt2svmmu3 BlameData:[] BlameSignature:[]}]
+  }]
+  result:map[1:{PubKey: PoolAddress: Status:2 Blame:reason:signers fail to sync before keygen/keysign is_unicast:false
+  round:
+  nodes:[{Pubkey:thorpub1addwnpepqtdklw8tf3anjz7nn5fly3uvq2e67w2apn560s4smmrt9e3x52nt2svmmu3 BlameData:[] BlameSignature:[]} {Pubkey:thorpub1addwnpepq2ryyje5zr09lq7gqptjwnxqsy2vcdngvwd6z7yt5yjcnyj8c8cn559xe69 BlameData:[] BlameSignature:[]}]
+  } 2:{PubKey: PoolAddress: Status:2 Blame:reason:signers fail to sync before keygen/keysign is_unicast:false
+  round:
+  nodes:[{Pubkey:thorpub1addwnpepqtdklw8tf3anjz7nn5fly3uvq2e67w2apn560s4smmrt9e3x52nt2svmmu3 BlameData:[] BlameSignature:[]} {Pubkey:thorpub1addwnpepq2ryyje5zr09lq7gqptjwnxqsy2vcdngvwd6z7yt5yjcnyj8c8cn559xe69 BlameData:[] BlameSignature:[]}]
+  } 3:{PubKey: PoolAddress: Status:2 Blame:reason:signers fail to sync before keygen/keysign is_unicast:false
+  round:
+  nodes:[{Pubkey:thorpub1addwnpepqtdklw8tf3anjz7nn5fly3uvq2e67w2apn560s4smmrt9e3x52nt2svmmu3 BlameData:[] BlameSignature:[]} {Pubkey:thorpub1addwnpepq2ryyje5zr09lq7gqptjwnxqsy2vcdngvwd6z7yt5yjcnyj8c8cn559xe69 BlameData:[] BlameSignature:[]}]
+  }]
+  tss_4nodes_test.go:296:
+      c.Assert(err, NotNil)
+  ... value = nil
+
+  result:map[1:{PubKey: PoolAddress: Status:2 Blame:reason: is_unicast:false
+  round:
+  nodes:[{Pubkey:thorpub1addwnpepqtdklw8tf3anjz7nn5fly3uvq2e67w2apn560s4smmrt9e3x52nt2svmmu3 BlameData:[] BlameSignature:[]}]
+  } 2:{PubKey: PoolAddress: Status:2 Blame:reason: is_unicast:false
+  round:
+  nodes:[{Pubkey:thorpub1addwnpepqtdklw8tf3anjz7nn5fly3uvq2e67w2apn560s4smmrt9e3x52nt2svmmu3 BlameData:[] BlameSignature:[]}]
+  } 3:{PubKey: PoolAddress: Status:2 Blame:reason: is_unicast:false
+  round:
+  nodes:[{Pubkey:thorpub1addwnpepqtdklw8tf3anjz7nn5fly3uvq2e67w2apn560s4smmrt9e3x52nt2svmmu3 BlameData:[] BlameSignature:[]}]
+  }]
+  we start the first server again
+  result:map[0:{PubKey: PoolAddress: Status:2 Blame:reason: is_unicast:false
+  round:
+  nodes:[]
+  } 1:{PubKey: PoolAddress: Status:2 Blame:reason: is_unicast:false
+  round:
+  nodes:[{Pubkey:thorpub1addwnpepqtdklw8tf3anjz7nn5fly3uvq2e67w2apn560s4smmrt9e3x52nt2svmmu3 BlameData:[] BlameSignature:[]}]
+  } 2:{PubKey: PoolAddress: Status:2 Blame:reason: is_unicast:false
+  round:
+  nodes:[{Pubkey:thorpub1addwnpepqtdklw8tf3anjz7nn5fly3uvq2e67w2apn560s4smmrt9e3x52nt2svmmu3 BlameData:[] BlameSignature:[]}]
+  } 3:{PubKey: PoolAddress: Status:2 Blame:reason: is_unicast:false
+  round:
+  nodes:[{Pubkey:thorpub1addwnpepqtdklw8tf3anjz7nn5fly3uvq2e67w2apn560s4smmrt9e3x52nt2svmmu3 BlameData:[] BlameSignature:[]}]
+  }]
+  we start the first server again
+  OOPS: 0 passed, 1 FAILED
+  --- FAIL: TestPackage (267.21s)
+      testing.go:1399: race detected during execution of test
+  FAIL
+  FAIL  gitlab.com/thorchain/thornode/v3/bifrost/tss/go-tss/tss 269.728s
+  FAIL
+  make: *** [Makefile:179: test-go-tss] Error 1
+  ```
+
+#### 21.01.2025 Tuesday 2h
+
+So these tests require some infrastructure backing?  
+There's a `./build/docker-compose.yml`
+
+```
+cd ./bifrost/tss/go-tss
+make docker-build
+```
+
+> ERROR [builder 5/7] RUN GO111MODULE=on go mod download
+
+They didn't add a `go.mod`? Can't use the project one 3 directories up
+with the docker container being built at the current directory.
+
+```
+go mod init
+go get github.com/cosmos/cosmos-sdk@v0.50.9
+go mod edit -replace github.com/binance-chain/tss-lib=gitlab.com/thorchain/tss/tss-lib@v0.1.5
+go mod edit -replace github.com/gogo/protobuf=github.com/regen-network/protobuf@v1.3.2-alpha.regen.4
+go mod edit -replace github.com/agl/ed25519=github.com/binance-chain/edwards25519@v0.0.0-20200305024217-f36fc4b53d43
+go mod tidy
+```
+
+Argh bit of a dependency tangle here. I'll just take the mod/sum from TC.
+
+```bash
+rm -rf ./bifrost/tss/go-tss
+
+cp -r /Users/adc/go/src/gitlab.com/thorchain/thornode/bifrost/tss/go-tss ./bifrost/tss/go-tss
+cp /Users/adc/go/src/gitlab.com/thorchain/thornode/go.{mod,sum} ./bifrost/tss/go-tss
+
+cd ./bifrost/tss/go-tss
+
+find . -type f -exec sed -i 's|gitlab.com/thorchain/thornode/v3|gitlab.com/mayachain/mayanode|g' {} +
+
+go mod edit -replace github.com/gogo/protobuf=github.com/regen-network/protobuf@v1.3.2-alpha.regen.4
+go mod tidy
+
+# downgrade cosmos version to match mayanode
+go get github.com/cosmos/cosmos-sdk@v0.45.9
+go get gitlab.com/mayachain/mayanode@v1.117.0
+
+# update dockerfile go version - build chain updates are mandatory
+sed -i 's|golang:1.15.6-alpine|golang:1.23-alpine|' ./Dockerfile
+
+make docker-build
+```
+
+
+Thought of a better way of doing this. You can just grab the project mod/sum in
+the Dockerfile.
+
+```
+COPY ../../../go.mod .
+RUN sed -i 's|gitlab.com/mayachain/mayanode|gitlab.com/mayachain/mayanode/bifrost/tss/go-tss|' ./go.mod
+COPY ../../../go.sum .
+```
+
+No you can't actually. Not sure how that worked first time - build cache?  
+So I'll do that in the Makefile instead...  
+
+```
+cp ../../../go.{mod,sum} .
+sed -i 's|gitlab.com/mayachain/mayanode|gitlab.com/mayachain/mayanode/bifrost/tss/go-tss|' ./go.mod
+docker build -t registry.gitlab.com/thorchain/tss/go-tss .
+rm go.{mod,sum}
+```
+
+Might need to try without cache temporarily:
+
+```
+docker build --no-cache -t registry.gitlab.com/thorchain/tss/go-tss .
+```
+
+Well, that does build. I don't like pinning the mayanode version though when
+we're inside that repo.
+
+#### 22.01.2025 Wednesday 6h
+
+```
+docker build --no-cache -f ./bifrost/tss/go-tss/Dockerfile -t registry.gitlab.com/thorchain/tss/go-tss .
+```
+
+I'm just going to send the entire mayanode project to the build context for this
+go-tss package and rework the build/docker files to avoid having to pin the
+mayanode version. Let's do this properly.  
+
+Personally I'd consider moving `gitlab.com/mayachain/mayanode/common/cosmos` but
+as that's how TC have done it I'll mirror that for compliance and security.
+
+Okay now the build works from the project root:
+
+```
+docker build \
+  --no-cache \
+  -f ./bifrost/tss/go-tss/Dockerfile \
+  -t registry.gitlab.com/thorchain/tss/go-tss \
+  .
+```
+
+The build config is actually set in the docker-compose.yml so running `up` will
+build the container image as well:
+
+```
+docker compose -f ./bifrost/tss/go-tss/build/docker-compose.yml up
+```
+
+```
+export COMPOSE_FILE=$(pwd)/bifrost/tss/go-tss/build/docker-compose.yml
+```
+
+> invalid subnet 192.168.10.0/16: it should be 192.168.0.0/16
+
+It's asking for a more specific mask `192.168.10.0/24` to match the `192.168.10.x`
+network.
+
+> Attaching to tss0-1, tss1-1, tss2-1, tss3-1  
+> Gracefully stopping... (press Ctrl+C again to force)  
+> Error response from daemon: Address already in use  
+
+Hmm.
+
+Kept getting `Error response from daemon: Address already in use`.  
+All a bit confusing but because of a later docker version, it requires more
+specific network mask. This forced me to reduce from 16 to 24, but then there
+wasn't space to create the gateway at the default address, so it used the first
+available address, which caused this address in use problem.
+
+x.x.x.0 - network  
+x.x.x.1 - gateway  
+x.x.x.255 - broadcast  
+
+I could set the gateway:
+
+```
+networks:
+  localnet:
+    driver: bridge
+    internal: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.10.0/24
+          gateway: 192.168.10.254
+```
+
+Or I could just widen the subnet back with the appropriate cidr:  
+`192.168.0.0/16`. 
+
+```
+docker build \
+  --no-cache \
+  -f ./bifrost/tss/go-tss/Dockerfile \
+  -t registry.gitlab.com/mayachain/tss/go-tss \
+  .
+
+docker run -it --rm registry.gitlab.com/mayachain/tss/go-tss
+docker run -it --rm registry.gitlab.com/mayachain/tss/go-tss sh
+```
+
+> WARN[0000] The "TSS_0" variable is not set. Defaulting to a blank string.
+
+Why do we need to pass keys into each container? Can't they just generate one?  
+It's not liking my key for some reason.  
+
+```bash
+for i in {0..3}; do
+  output=$(go run ./_cmd/gen_secp256k1_key)
+  key=$(echo $output | jq '.base64')
+  export TSS_$i=$key
+  echo $key
+done
+```
+
+I just copied those keys into the docker compose file.  
+Well that was wrong.  
+Need to use the keys in `tss_4nodes_test.go` `testPriKeyArr`.  
+
+For someone who hasn't run these before it'd be helpful to know: when are these
+tss containers ready for me to start the tests?  
+Shortly after each one logs `Starting the TSS servers`.
+
+I think the docker compose file is just a red herring. The tests do create
+tss servers.
+
+```
+INF stop party coordinator module=party_coordinator service=four_nodes_test
+INF The Tss and p2p server has been stopped successfully service=four_nodes_test
+ERR fail to open stream error="fail to create stream to peer(16Uiu2HAmACG5DtqmQsHtXg4G2sLS65ttv84e7MrL4kapkjfmhxAp):failed to dial 16Uiu2HAmACG5DtqmQsHtXg4G2sLS65ttv84e7MrL4kapkjfmhxAp: all dials failed\n  * [/ip4/192.168.64.1/tcp/16666] dial tcp4 192.168.64.1:16666: connect: connection refused\n  * [/ip4/127.0.0.1/tcp/16666] dial tcp4 127.0.0.1:16666: connect: connection refused" module=party_coordinator service=four_nodes_test
+ERR error in send the join party request to peer error="fail to create stream to peer(16Uiu2HAmACG5DtqmQsHtXg4G2sLS65ttv84e7MrL4kapkjfmhxAp):failed to dial 16Uiu2HAmACG5DtqmQsHtXg4G2sLS65ttv84e7MrL4kapkjfmhxAp: all dials failed\n  * [/ip4/192.168.64.1/tcp/16666] dial tcp4 192.168.64.1:16666: connect: connection refused\n  * [/ip4/127.0.0.1/tcp/16666] dial tcp4 127.0.0.1:16666: connect: connection refused" module=party_coordinator service=four_nodes_test
+ERR fail to form keygen party with online:[16Uiu2HAm4TmEzUqy3q3Dv7HvdoSboHk5sFj2FH3npiN5vDbJC6gh 16Uiu2HAm2FzqoUdS6Y9Esg2EaGcAG5rVe1r6BFNnmmQr2H3bqafa 16Uiu2HAmACG5DtqmQsHtXg4G2sLS65ttv84e7MrL4kapkjfmhxAp] error="fail to join party, timeout" module=tss service=four_nodes_test
+ERR fail to write to stream error="fail to open stream to peer(16Uiu2HAmACG5DtqmQsHtXg4G2sLS65ttv84e7MrL4kapkjfmhxAp): fail to create new stream to peer: 16Uiu2HAmACG5DtqmQsHtXg4G2sLS65ttv84e7MrL4kapkjfmhxAp, dial backoff" module=communication service=four_nodes_test
+ERR fail to generate message with 1m30s module=keygen msgID=65915200b118c2773a372312c2a62a085b3c51b8dcd3d76f660b870de90bbcff service=four_nodes_test
+ERR err in keygen error="fail to process key sign: error Tss Timeout" module=tss service=four_nodes_test
+ERR the leader has not reply us module=party_coordinator service=four_nodes_test
+ERR leader(thorpub1addwnpepq2ryyje5zr09lq7gqptjwnxqsy2vcdngvwd6z7yt5yjcnyj8c8cn559xe69) is not reachable module=party_coordinator service=four_nodes_test
+```
+
+Rant: ERRORS
+
+An error should be somewhere you don't want the program to go. It requires code
+changes, reconfiguration, or an external situation like network availability to
+resolve.
+
+Rant: SLEEP IN TESTS
+
+It's better to avoid sleeping in a test. Firstly, it slows down development.
+Secondly, it's brittle when you're working with multiple goroutines and
+variable workloads. Thirdly, it's harder for the next developer to determine
+what you're trying to achieve. Fourthly, it breaks benchmarking. Fifthly, it's
+ugly and I hate it.
+
+I'm seeing `fail to process key sign` which is either in `GenerateNewKey` or
+`SignMessage`.
+
+These tests leave me a little confused. Managed to get them passing by setting
+the tss server timeouts to be consistent.
+
+```make
+test-go-tss:
+  @${CGO_VARS} go test ${TEST_BUILD_FLAGS} --race -v -failfast -count 1 "./bifrost/tss/go-tss/tss"
+```
+
+The tests can pass now but because of the sleeps they're not particularly robust.  
+Enough for me to move on though.
+
+Latest commit on thorchain develop:
+
+> [tss] Clean up old go-tss repo artifacts
+
+That was today!
+
+Alright I'm going to merge all the latest go-tss on thorchain/develop into my
+branch.
+
+```
+git log --all --since="5 months ago" --pretty=format:"%h - %an, %ar : %s" -- x/thorchain/types/type_vault.go
+
+39fb832e2 - Beorn 9R, 2 weeks ago : Squashed commit from `sol-rc` containing
+
+git branch -a --contains 39fb832e2
+
+* beorn/sol-geyser
+  remotes/origin/beorn/sol-geyser
+```
+
+Yeah I think I'm still on the right track here. Bring in go-tss from develop
+and sol-geyser ontop of that.
+
+Merged go-tss from thorchain/develop, tests passing nicely.
+
+Continuing with the sol-geyser changes then:
+
+There's this `common.ECDSA` which doesn't have a definition. Just get rid of it.
+
+continue from openapi...
+
+#### 23.01.2025 Thursday 6h
+
+https://openapi-generator.tech
+
+Openapi
+
+- [x] Vault
+- [x] VaultInfo
+- [x] ObservedTx
+- [x] TxOutItem
+
+Proto
+
+- [x] TssVoter
+- [x] Vault
+- [x] ObservedTx
+- [x] MsgTssPool
+- [-] QueryVault
+
+Observations / Questions
+
+• Mayachain doesn't have any query proto files so QueryVaultRequest/Response was
+  skipped
+
+• Thorchain has a tss pool field secp256k1 signatures that doesn't seem to be
+  ported over to maya yet. Should we leave a space for that?
+
+  Search for:
+  `// TODO: Decide if we want to leave space for secp256k1_signatures from thorchain`
+
+```
+make generate
+```
+
+- [x] cmd/bifrost/health_test - KeygenAllAlgo and other ECDSA stuff
+- [x] cmd/constants - might need EDPath
+- [x] common/chain - need to update GetSigningAlgo
+- [x] proto/.../chain/v1/types/msg_tss_pool.proto - pool_pub_key_eddsa
+- [x] proto/.../chain/v1/types/query_vault.proto - pub_key_eddsa
+- [x] proto/.../chain/v1/types/type_observed_tx.proto - observed_pub_key_eddsa
+- [x] proto/.../chain/v1/types/type_tss.proto - pool_pub_key_eddsa
+- [x] proto/.../chain/v1/types/type_vault.proto - pub_key_eddsa
+
+- [-] test/fixtures/... - skipped for now
+- [-] test/regression/... - skipped for now
+
+- [-] common/pubkey_mainnet_test - missing test case
+- [-] common/pubkey_test - missing test case, there's KeyTestPubAddrED25519 at the bottom
+- [-] common/tx - might need a length case statement for the different cardano address strings
+
+```
+make protob-docker
+
+does not match the detected host platform (linux/arm64/v8) and no specific platform was requested
+go: go.mod requires go >= 1.22.2 (running go 1.22.1; GOTOOLCHAIN=local)
+make: *** [Makefile:79: protob] Error 1
+make: *** [Makefile:82: protob-docker] Error 2
+```
+
+generate proto is broken, need to rebuild the builder with updated go ver.
+
+```
+cd ci
+sed -i 's|golang:1.22.1|golang:1.22.2|' ./Dockerfile.builder
+docker buildx build -t registry.gitlab.com/mayachain/mayanode:builder-v6 -f Dockerfile.builder .
+```
+
+> Package 'linux-headers-amd64' has no installation candidate
+
+```
+docker run -it --rm golang:1.22.11 sh
+
+export CGO_ENABLED=1
+
+apt update
+
+apt install -y --no-install-recommends \
+  curl \
+  git \
+  jq \
+  make \
+  protobuf-compiler \
+  xz-utils \
+  sudo \
+  python3-pip
+
+# required for musl libc
+apt install -y --no-install-recommends \
+  musl-tools \
+  linux-headers-generic \
+  build-essential
+
+rm -rf /var/cache/apt/lists
+go install mvdan.cc/gofumpt@v0.5.0
+
+# ln -s /usr/include/linux /usr/include/x86_64-linux-musl/
+# ln -s /usr/include/asm-generic /usr/include/x86_64-linux-musl/
+# ln -s /usr/include/x86_64-linux-gnu/asm /usr/include/x86_64-linux-musl/
+```
+
+```
+docker commit bd4cab8ff5f5 registry.gitlab.com/mayachain/mayanode:builder-v6
+
+docker run \
+  --rm \
+  -v $(pwd):/app \
+  -w /app \
+    registry.gitlab.com/mayachain/mayanode:builder-v6 \
+      make protob
+```
+
+Hmm. That worked for me just fine. So it looks like we just switch to the cpu
+architecture agnostic package `linux-headers-generic` and just do away with
+those symlinks. Or maybe it's fine for protobuf but breaks something else?
+Going to leave as is for now and just use my modified version without committing.
+
+- [x] x/.../keeper/v1/alias.go - NewVaultV2
+- [x] x/.../keeper/v1/keeper.go - prefixVaultAsgardEDDSAIndex
+- [x] x/.../keeper/v1/keeper_vault.go - vault.GetAddress
+- [x] x/.../keeper/v1/keeper_vault_test.go
+- [x] x/.../types/msg_tss_pool_v2.go
+- [x] x/.../types/test_common.go
+- [x] x/.../types/type_tss.go
+- [x] x/.../types/type_tss_test.go - NewTssVoter func sig change
+- [x] x/.../types/type_vault.go
+- [x] x/.../types/type_vault_v2.go
+- [x] x/.../types/type_vault_v2_test.go
+- [x] x/.../alias.go - NewMsgTssPoolV2, NewVaultV2
+- [x] x/.../handler_outbound_tx_test.go
+- [x] x/.../handler_tss.go
+- [x] x/.../handler_tss_test.go
+- [x] x/.../manager_network_current.go - just a getaddress change?
+- [x] x/.../manager_txout_current.go
+- [x] x/.../querier.go
+- [x] x/.../querier_quotes.go
+- [x] x/.../querier_test.go
+- [x] x/.../thorchain_test.go - this one hasn't been renamed to mayachain_test? regardless, needs NewMsgTssPoolV2
+
+• Do we need the new `AddCoins` func on keeper?  
+• Do we need `MakeTestCodec` in test_common?  
+• In the `handler_outbound_tx_test` thorchain specify `helper.asgardVault`, we're using `helper.yggVault`. One must be wrong  
+• Noticed a few mistakes/things missed by tc dev in `handler_tss_test` there will be a few differences  
+• MsgSwap in maya doesn't have a from address, but it does in thorchain?  
+• Not happy with the coverage done by thorchain `TestQueryAsgardVault`, doesn't seem to test eddsa response  
+
+Wow. That was a lot.
+
+Now. Do the unit tests pass?
+
+```
+make test 2>&1 | ggrep -v "ignoring duplicate libraries\|no test\|cgo-gcc-prolog\|has been explicitly marked deprecated here\|first deprecated in macOS\|In file included from"
+```
+
+```
+chain_test.go:32:
+    c.Assert(algo, Equals, SigningAlgoSecp256k1)
+... obtained common.SigningAlgo = "ed25519"
+... expected common.SigningAlgo = "secp256k1"
+... Difference:
+...     "ed25519" != "secp256k1"
+```
+
+```
+x/mayachain/keeper/v1/keeper_vault.go:244:43: not enough arguments in call to k.GetKey
+  have ("gitlab.com/mayachain/mayanode/x/mayachain/keeper/types".DbPrefix, string)
+```
+
+```
+bifrost/tss/go-tss/p2p/peer_status.go:18:27: undefined: messages.JoinPartyLeaderComm
+```
+
+go-tss proto hasn't been compiled?
+
+```
+cd ./bifrost/tss/go-tss
+make protob
+cd -
+```
+
+```
+bifrost/pkg/chainclients/cardano/client.go:93:54: not enough arguments in call to blockscanner.NewBlockScannerStorage
+  have (string)
+  want (string, "gitlab.com/mayachain/mayanode/config".LevelDBOptions)
+bifrost/pkg/chainclients/cardano/client.go:111:56: not enough arguments in call to utxo.NewTemporalStorage
+  have (*leveldb.DB)
+  want (*leveldb.DB, int)
+```
+
+```
+x/mayachain/keeper/v1/keeper_tss_test.go:15:37: not enough arguments in call to NewTssVoter
+  have (string, nil, "gitlab.com/mayachain/mayanode/common".PubKey)
+  want (string, []string, "gitlab.com/mayachain/mayanode/common".PubKey, "gitlab.com/mayachain/mayanode/common".PubKey)
+```
+
+```
+cmd/bifrost/main.go:146:3: cannot use tmPrivateKey (variable of type "github.com/tendermint/tendermint/crypto".PrivKey) as "github.com/cometbft/cometbft/crypto".PrivKey value in argument to tss.NewTss: "github.com/tendermint/tendermint/crypto".PrivKey does not implement "github.com/cometbft/cometbft/crypto".PrivKey (wrong type for method Equals)
+    have Equals("github.com/tendermint/tendermint/crypto".PrivKey) bool
+    want Equals("github.com/cometbft/cometbft/crypto".PrivKey) bool
+```
+
+• tendermint/crypto has been switched out for cometbft/crypto. Is that what we
+  actually want to follow?
+
+```
+FAIL: type_vault_v2_test.go:12: VaultSuiteV2.TestVaultV2
+
+type_vault_v2_test.go:20:
+    c.Check(err, IsNil)
+... value *fmt.wrapError = &fmt.wrapError{msg:"tthorpub1zcjduepqnd6pdwxvzu35dh60d256sewc5xczlxa35jrzq4uyd95x5476afrs9lzd5u is not bech32 encoded pub key,err : invalid Bech32 prefix; expected tmayapub, got tthorpub", err:(*errors.errorString)(0x1400123cb20)} ("tthorpub1zcjduepqnd6pdwxvzu35dh60d256sewc5xczlxa35jrzq4uyd95x5476afrs9lzd5u is not bech32 encoded pub key,err : invalid Bech32 prefix; expected tmayapub, got tthorpub")
+
+type_vault_v2_test.go:26:
+    c.Check(ethAddr.String(), Equals, "0x39da14bfdcfb127766bdbe0c335ef1bb8bce77a2")
+... obtained string = ""
+... expected string = "0x39da14bfdcfb127766bdbe0c335ef1bb8bce77a2"
+```
+
+Not sure how much I should be messing with ETH.
+
+```
+edd2519 pubkey:    tmayapub1zcjduepqfazeqcydxqj33u9q0etutunl9xm424rhzlyepm0k6s54898yrvkq38v4kz
+public key hex:    61b59ae13ca2a59dbb43345eb9842640036cbbb29e5ee295e5ef1c0c8d
+cardano address:   addr1vx6e4cfu52jemw6rx30tnppxgqpkewajne0w9909auwqerg5g3cdl
+```
+
+All unit tests passing. Still some tests to add though.
+
+Continue from TestPubKeyGetAddress...
+
+#### 24.01.2025 Friday 6h
+
+There's actually 2 TestPubKeyGetAddress functions:
+- `pubkey_mockenet_test.go`
+- `pubkey_mainnet_test.go`
+
+```
+c.Assert(err, IsNil)
+Expected :
+Actual   :*fmt.wrapError = &fmt.wrapError{msg:"fail to encode the address, err: expected a 32 length ed25519 private key, got 33 bytes", err:(*errors.fundamental)(0x14000282750)} ("fail to encode the address, err: expected a 32 length ed25519 private key, got  ...
+```
+
+```
+pubkey cosmospub1addwnpepq26xxtggfp0lrhedk4demt7jxdrar3r6g4c89g0g003x39j5n2rnwvw85zu
+pk.bytes 02b4632d08485ff1df2db55b9dafd23347d1c47a457072a1e87be26896549a8737
+pk.address.bytes 93ce48570b55c42c2af816aeaba06cfee1224fae
+```
+
+```
+*secp256k1.PubKey
+*ed25519.PubKey
+```
+
+```
+github.com/cometbft/cometbft/crypto/ed25519
+github.com/cosmos/cosmos-sdk/crypto/keys/ed25519
+github.com/tendermint/tendermint/crypto/ed25519
+```
+
+Improved the error:
+
+> invalid pubkey for deriving cardano address. expected *ed25519.PubKey, got *secp256k1.PubKey
+
+
+We're still being asked to find the cardano address for a (bechified) secp256k1
+public key.
+
+Need to add Cardano addresses to `PubKeyTestSuite`.  
+Reworked those tests to make them cleaner and support both key types.  
+Cosmos still complains that eddsa shouldn't be used for app stuff.  
+
+
+```
+make test 2>&1 | ggrep -v "ignoring duplicate libraries\|no test\|cgo-gcc-prolog\|has been explicitly marked deprecated here\|first deprecated in macOS\|In file included from"
+```
+
+Rant: SIMPLICITY VS WORKLOAD
+
+Don't worry, I'm writing this while the tests run so it's not like I'm wasting
+time. Is it better to have a load of copypasta which is easier to understand
+but appears in multiple places and is more volume to read, vs a more DRY
+solution that might take a little longer to understand (ideally not by much)
+but condenses everything into a small footprint which requires less developer
+changes to augment with improvements down the line? I'm clearly in favour of
+the latter. It might take one developer more time to read, but once understood,
+there's just less body of code to review in future for maintainers. I get that
+tests should be small and isolated and clear, but I think we can stretch to
+looping over an array of test cases and including the switch/case statements to
+handle edge cases, so long as it's results in a compact test.
+
+Tests passing.
+
+- [x] common/pubkey_mainnet_test - missing test case
+- [x] common/pubkey_test - missing test case, there's KeyTestPubAddrED25519 at the bottom
+
+Yeah cardano tx hashes are 64 chars. Removing todo.
+
+- [x] common/tx - might need a length case statement for the different cardano address strings
+
+These are some remaining todos I've introduced:
+
+- [ ] TODO: Can we MinTransactionFee from the node?
+- [ ] TODO: Determine if chainHeight is actually needed. Explain here.
+- [ ] TODO: At this point we're assuming the output 1 address is the asgard addr
+- [ ] TODO: Checkpoint?
+- [ ] TODO: ensure UTXOs are spend from oldest to youngest
+- [ ] TODO: skip utxos below the dust threshold (not sure that's relevant for cardano?)
+- [ ] TODO: ensure the utxo is valid (spendable, not locked, etc.)
+- [ ] TODO: implement
+- [ ] TODO: Add case for ADAChain
+- [ ] TODO: confirm for ADA
+- [x] TODO: Decide if we want to leave space for secp256k1_signatures from thorchain
+- [ ] TODO: check for lookup by EDDSA pubkey
+- [ ] TODO: Do we use NewVaultV2 here?
+- [ ] TODO: Shouldn't we test the eddsa public key/address is actually returned with the query?
+
+Asked Itzamna about leaving space in the proto messages for more thorchain ports.
+
+`TestQueryAsgardVault` is testing the vault query returns nil when we haven't
+created any vaults - why bother?
+
+Itz wants the secp sigs in, let it be so.
+
+> FYI @Mo999 will be taking care of the EdDSA and @Bitol on bringing keysign/keygen stuff up to date
+
+- [x] `make generate` needs to cover go-tss
+
+Check at least this file is updated:  
+`bifrost/tss/go-tss/messages/join_party.pb.go`
+
+I don't have a mainnet version of my cardano container.  
+`registry.gitlab.com/mayachain/devops/node-launcher:cardano-daemon`
+
+Now I do. There are 2 entrypoints:
+- /scripts/entrypoint-mainnet.sh
+- /scripts/entrypoint-privnet.sh
+
+No additional command flags required.
+
+Right I'm back at the `cardano-rpc` not parsing the older blocks.  
+Switch to Apollo now?  
+Ah it wasn't apollo it was:  
+`github.com/blinklabs-io/gouroboros`  
+
+#### 27.01.2025 Monday 6h
+
+Continuing with gouroboros refactor in cardano-go...
+
+• You can have multiple blocks per slot (but not of the same type I assume)
+• There are many blocks without txs
+• Do we always have 1 EBB (epoch boundary block) at the start of the next epoch?
+• What are the epoch boundaries on mainnet?
+
+Mainnet
+
+| Era Bound | SlotNo | Hash |
+|-----------|---------|------|
+| Last Byron Block | 4492799 | f8084c61b6a238acec985b59310b6ecec49c0ab8352249afd7268da5cff2a457 |
+| Last Shelley Block | 16588737 | 4e9bbbb67e3ae262133d94c3da5bffce7b1127fc436e7433b87668dba34c354a |
+| Last Allegra Block | 23068793 | 69c44ac1dda2ec74646e4223bc804d9126f719b1c245dadc2ad65e8de1b276d7 |
+| Last Mary Block | 39916796 | e72579ff89dc9ed325b723a33624b596c08141c7bd573ecfff56a1f7229e4d09 |
+| Last Alonzo Block | N/A | N/A |
+
+Testnet
+
+| Era Bound | SlotNo | Hash |
+|-----------|---------|------|
+| Last Byron block | 1598399 | 7e16781b40ebf8b6da18f7b5e8ade855d6738095ef2f1c58c77e88b6e45997a4 |
+| Last Shelley block | 13694363 | b596f9739b647ab5af901c8fc6f75791e262b0aeba81994a1d622543459734f2 |
+| Last Allegra block | 18014387 | 9914c8da22a833a777d8fc1f735d2dbba70b99f15d765b6c6ee45fe322d92d93 |
+| Last Mary block | 36158304 | 2b95ce628d36c3f8f37a32c2942b48e4f9295ccfe8190bcbc1f012e1e97c79eb |
+| Last Alonzo block | 62510369 | d9312211f9bc4cae34de422d9f4281a2b0344e86aac6b31eb54e2ee90f44a09b9 |
+| Last Babbage Block | N/A | N/A |
+
+cardano docker container is not gracefully shutting down both rpc AND node.
+
+block height is always 0 from this library. can we make do with just an auto
+increment value on the db?
+
+block: num 25210 | slot 25222 | hash 27a8ad49c4c587cfa62a773eb8ed995ebd8027f56b097f3676cd172eafe15bb1
+
+• If you request too large a range from the node, it essentially freezes it and
+it starts taking ages.
+
+Might have to redesign the fetch
+
+- Fetch all the points until the tip first
+- Then fetch 10k blocks at a time until we're caught up to the tip?
+
+Database updates needed for this...
+
+Why does the cardano node just crap out. It crashes. I've had it before, and am
+getting it again. No errors. It just dies.
+
+I'm using the `ghcr.io/intersectmbo/cardano-node:9.2.0` image. Maybe update?  
+Yep. To `10.1.4`.
+
+`ghcr.io/intersectmbo/cardano-node:10.1.4`
+
+Looks like it might have something to do with:  
+> Invalid snapshot DiskSnapshot {dsNumber = 2752412, dsSuffix = Nothing}InitFailureTooRecent (RealPoint (SlotNo 2752412) d47ba4540e0a21ca013a483fa1a1550958d56adf437efefd93c588b3a4733dfb)
+
+The the time of writing there are 11.5 million blocks.  
+`11 409 543`  
+
+It takes 28s on my machine to add 10k points to the index.  
+So about 9h to complete the point index.  
+
+So we either:
+- have an official maya cache of these points at 10mill
+- go back to reading from the chunk store
+- just let it take a day to catch up
+
+Still crashing. Doubled my docker mem from 16GB to 32GB.  
+CPU is already at max 10.  
+Doubled disk usage to 1.5TB.  
+Maxed sawp at 4GB.  
+
+Got to slot 100024.  
+Lets see if we save the next correctly...  
+
+One annoying thing with the ouroboros library is we get a very unhelpful EOF
+error if the connection fails. Why not: "unable to connect to node"? or "node
+did not respond with valid protocol message" or "failed to exchange handshake"
+etc. Let's be explicit please and always wrap standard net/io package error
+with additional info, ideally a stack trace in every situation.
+
+Using `github.com/pkg/errors` it would be:
+
+```go
+conn, err := net.Dial(...)
+if err != nil {
+  return errors.WithStack(err)
+}
+
+// or better yet (this one also includes a stack trace if you're using the errors package)
+
+if err != nil {
+  return errors.Wrap(err, "unable to dial node")
+}
+```
+
+Looks like we have to wait for "pushing ledger state" to complete before
+connecting to the node.
+
+One little idiosyncracy with go I didn't realise, is that if you have a struct
+which implements the Stringer interface, if it is an alias of `[]byte` and you
+call `fmt.Printf("%x", variable)` on the variable like that, it will take the
+output of String() BEFORE it converts to hex. So if your String() method already
+converts from `[]byte` to `string` (hex) with `hex.EncodeString`, it will be
+double-converted into hex.
+
+> batch 1 to 10000 took 1m10.565514375s from slot slot: 170025 | hash: 0d6e0591cf0e53c0955f2bbb48aa4f1de9381fa837e1c6d440402c623030e513 to slot slot: 180023 | hash: 58241a6e2094f7abaa5e7766a4846bd3c8eab1f3207a36417fea7740ad439c09
+> batch 2 to 20000 took 1m13.128117916s from slot slot: 180024 | hash: bc6bf2ff8fbeb1e8895dbcb146e39a9cb6e45402a9aa3cb671521ad828085114 to slot slot: 190023 | hash: 3e9316e75fc30e4e9fdbb28c26987505aeaf11148dd86d98c15d440add725e78
+> batch 3 to 30000 took 1m4.142178209s from slot slot: 190024 | hash: 067e965e5aad78ac5dcae32044e796fa5ee5475f85752d291a9565ffed84942e to slot slot: 200022 | hash: 2217aaaf678e93009a672f848cf0cb24e09621300c405251c85102c5a5e7f31c
+> batch 4 to 40000 took 42.007670709s from slot slot: 200023 | hash: 707afe2fbca832db01f59fae239b1534eba2b2d9b9778884b755b75b5c767dcc to slot slot: 210022 | hash: 2f9f7334e61b9f974d26037a1732f80adbd62094474fec7fd97700f29be19b7c
+> batch 5 to 50000 took 44.022881042s from slot slot: 210023 | hash: de1faade1ab3e1ab461d8931a4641d66c687e272494586f7647166bd4bac9056 to slot slot: 220021 | hash: 029e4e02cd568f973278c314ffe1dd0b95ca39540749f01daa3733945b522051
+
+Going to take just under ~20h to complete the index at that rate. Not great.
+
+#### 28.01.2025 Tuesday 2h
+
+It's been running a while now. The duration for each batch shows some crazy differences:
+
+> batch 6550000 took 5m10.724322708s from slot slot: 51391818 | hash: a560c8f090c0e7c56fd267b9decf14212e72a67e1f19cc8b25e03c13383a25a1 to slot slot: 51547933 | hash: 8d4b0ce9f386cd003a26d09fc341eba4e172970669602304a2365e4ac7539538
+> batch 6550031 took 111.389583ms from slot slot: 51547951 | hash: 9a077b8eac63f18f84f9114451aefd91f32fcc5d2855ce998988b30cd5531d49 to slot slot: 51548802 | hash: b98c0e48d2a187ec56407a240fc7efc431ac4fa020594c54e38415aecb5a7939
+
+5m to 0.1s really? Are we caught up?
+
+```
+ 52278359
+146542532
+```
+
+We're caught up with the node, but the node is still catching up.  
+
+Need to switch from batching unless we match the tip, to batching until we
+reach the tip once - then always push single points / blocks from that point on.
+
+Otherwise we drag behind only occasionally catching up with the node.
+
+So I'm getting multiple blocks per slot on many occasions.  
+cardanoscan doesn't seem to correlate with these.  
+
+Actually I've mentioned `1941d944df546dea699791c318aeb9cc63b94e4cdb133d79856cda35bf7ecbb1` above. It looks like the end
+of epoch / start of new epoch block.
+
+I'm a bit torn whether to continue with my project or keep going down the
+gouroborus route. On the one hand my project would be able to read chunk files
+and handle all these initial blocks so much faster. On the other gouroborus is
+offical and supposedly battle tested and I think they've worked out more of the
+kinks with the n2n protocol.
+
+Argh. Continuing with gouroborus until it's done. Then maybe can go back to mine
+and make it more efficient if people want that.
+
+`BlockTypeByronEbb` is `blockType == 0` and that's the boundary for all epochs.
+
+cb829d6055ef80e7cf94c6b450c1fe96a300697945806b0654e51f0d403c9f5a
+1816fefcf5d342b6f7bf34d5264bd8aa25f307174c4a7d78db5e41dfd387b5bf
+
+
+#### 30.01.2025 Thursday 6h
+
+I'm now at slot `146 715 267` `f529b2d6a90c9ae8ef77f643dbad30139e48b67ad13714d97f4cd57bc1ab82c4`.
+
+My point index is `1.7 GB` without transactions.
+
+The node took a few days to fully sync. Going to try rebuilding the point index
+from a node that's already synced and see how long that takes (and if there are
+any issues)
+
+```
+cp gouroboros_follow_chain.db gouroboros_follow_chain.db.bak
+```
+
+It's going to take ~30h to index the points this way.  
+Point index logic is there, now the block fetch / tx index.  
+
+---
+
+1. The block types are defined throughout the
+`github.com/blinklabs-io/gouroboros/ledger` package in various files but can be
+coalesced into:
+
+```go
+const (
+  BlockTypeByronEbb  = 0
+  BlockTypeByronMain = 1
+  BlockTypeShelley   = 2
+  BlockTypeAllegra   = 3
+  BlockTypeMary      = 4
+  BlockTypeAlonzo    = 5
+  BlockTypeBabbage   = 6
+  BlockTypeConway    = 7
+)
+```
+
+2. I'm not sure to be honest. It might be that whatever point has been written
+to the sqllite db first is always the EBB. However there might be
+inconsistencies in the data and I'd rather not take the chance relying on that
+pattern.
+
+3. Yes. We'll be setting multiple points in batches as the EBBs occur after x
+blocks / points. Obviously for the first batch we'll not have a previous point,
+so we can just set the 2 points according to the block fetch.
+
+4. I believe so. Would it be better to add some kind of "order by" query when
+   iterating the slot table just in case?
+
+5. As far as I know, yes. We should assert this is the case and exit with a
+descriptive fatal error message the duplicates are not: 1 EBB and 1 "block of a
+specific era as defined in your question 1 above"
+
+---
+
+```
+rm gouroboros_follow_chain.db; cp gouroboros_follow_chain.db.bak gouroboros_follow_chain.db
+
+sqlite3 gouroboros_follow_chain.db ".backup 'clean_copy.db'"
+
+mv clean_copy.db gouroboros_follow_chain.db
+```
+
+17:46:20 INF found block at point 146713650 a3d7678d318d9d2f048a50fa669646f3d6cfa0352461d7e68c59ce92c743c7d0  
+17:46:20 INF found block at point 146713650 1ae87e65acdc1d70898460f79209198f363b66ec051fb8f6581fafdc743fe174  
+17:46:20 FTL slot 146713650 did not contain exactly one EBB and one era block  
+
+Interesting. At slot `146713650` we have 2 blocks neither ebb??
+
+Found the `1ae` block, the `a3d` block isn't listed on:
+- cardanoscan
+- cexplorer
+
+```
+SELECT * FROM points WHERE slot < 146713650 ORDER BY slot DESC LIMIT 2;
+SELECT * FROM points WHERE slot > 146713650 ORDER BY slot ASC LIMIT 2;
+```
+
+```
+146713709 a7d9394c9f98bde676f632f2dcc550c036bf3830cfce45f95abe88a934e7b484 √
+146713704 76c47208ad2924cd8ed21ac5b391de610f95c6f60432f7c14fd5216125cbe49a √
+
+146713650 a3d7678d318d9d2f048a50fa669646f3d6cfa0352461d7e68c59ce92c743c7d0 MISSING
+146713650 1ae87e65acdc1d70898460f79209198f363b66ec051fb8f6581fafdc743fe174 √
+
+146713646 28e3f27f2651340438f726da5921d0e907be3eae4dd85f8ffcaf3aadc3b0c834 √
+146713633 12c623474331a96253243af38f0e449aeeb41cbe7a00c8c5f676caf6a1dd21ba √
+```
+
+My node can fetch that fine, conway, 2 transactions.  
+It will effect the block height to include/ignore it.  
+wtf.  
+
+```
+*conway.ConwayBlock
+era:  7
+slot: 146713650
+hash: a3d7678d318d9d2f048a50fa669646f3d6cfa0352461d7e68c59ce92c743c7d0 MISSING
+txs:  2
+
+- tx 0
+  hash: db8895edcaa06fc97a6d4afbbfa5d0eaa1cb9312cf240e5e0adce2f0f2618dd1 FOUND
+
+- tx 1
+  hash: d89eb38a21c8ab0c838785c4cf80d47def70a922563b30f6e410e13238be86f2 FOUND
+
+85828a1a00ae45e11a08beac32582028e3f27f2651340438f726da5921d0e907be3eae4dd85f8ffcaf3aadc3b0c8345820789fda91740f0aab0347d2e4e24aca9a498d6c1f38d3241f35b8c2ccadf3ca355820972e65bb174fec57046a1841640b07f62e60abfba6f28b4190897b79e4ba0325825840bf286a035930cf0ce47c292fde10692e8e38feddfa0e935d6839b652811bfe30c10e0c9fdf9df853d6c679f31c888af26f4790d438ed665be839792342e74fda58509a7fe45e440e0ccfddee5860c308f61875d9f8ef4d83de9c83acc12532c63d4df61713a5e657e24ed5d7030b4c473c644a6e8dfc15cd52f23e184bad54df9cb44aeb74250f341c3b7c98db1d169c140b1907035820f012839c5eb375acef4f5cfa17f4847eb0b2bbf04e0ff03bdc480df3c9fe948484582037faf8b0c793d35f025a1c5122157eed3d7447425855cc14c030227efed3acb01219045758408ddd5d519c6ad4a43a7ad9c08e4db4fa406536e646741bda7af9272d54f8748054f46be15c0dce2f0eed158e9d1b9f8f724c4205aadb2cda141fe1edb1888002820a025901c029c877560baf770396a8a2a350e4f204c3c26d8beac1a2d38068c7ae2116f5cf00504cdd386adc065e9e0cb9810a6c68988e5c8b5052c01a52c2b0cd2790cf001b69b040de5d2a5bc0e5461b0bf0dfc85f47fac7c15fdd7de3d4d4c3e3518e4d2fee079393754db93aacf4da645f7d855a2a76a64be3c1521e64d9e24b3d6302c085c606ef6ed467892aaa61c26f5b2e5dea726636883a73ff3a5849df96e2d3952f5235843fb2c52cac4e350a9fe4684069b17a1d1814d1100d472a5c0e6f8af11d6dd55883714c490e52ece0902e107250aaad830093ebd21710e4215dd5ac7d9c5191e08fce98e3bce7eaeb966b914b0134255348294d12cb4be428b90fdc9cb295484f25554602910cedaa6743dcf244cc7767eea92ac342a78f9130c30371833b37317b0bca46fcac23416cb25a0445dbb4abe7f7ab97e72718b82708db629c5564a7506bb96431296f58a5464079cc1f22dbb7da40bbfca879654d5d25df904fe5ffbf6de2d06ea7b9b26788e26e4a0a8b80f1414a233a02425e7dbac693be715e6515527b6c59c15179571b8d9dc3bddb3cdf04f3bcbc3925a1ba76f0575820998ebc256b4024f3d269ffd296043a0ccb42c61a2f8b08007867ca9bbf82ac00838258200303adff747744cc37c66cb87e1c3dda2b40465700aac5b7c1bf53c2860830cd02825820d6183807f2679dafe2c02aafd823dea01960fc4af27e1c1fac089dca6cc82e2a00825820e0a4aa807b8b3bb8d4e50bd826c424f72a2caf2ca028ba34b44ab11caf48d3ec000183a300583911e0302560ced2fdcbfcb2602697df970cd0d6a38f94b32703f51c312bbc10fe312acd69e2e12cbc2cca05aa0e432e3dee65d5a9498344e4aa01821b00000001708719bda2581ca8f54e6eb47a7ef6d96aceb892f4e9b6211f8b736a1f6d3109648c20a1534f6666696369616c436861726c65736d656d651a100ea6c6581ce0302560ced2fdcbfcb2602697df970cd0d6a38f94b32703f51c312ba15820000de140ad4c0f0d427c258086e0e3ca80916333f12a84a5629f4b4b321ac18601028201d818586ed8799f581cad4c0f0d427c258086e0e3ca80916333f12a84a5629f4b4b321ac1869f9f4040ff9f581ca8f54e6eb47a7ef6d96aceb892f4e9b6211f8b736a1f6d3109648c20534f6666696369616c436861726c65736d656d65ffff1a1fb9417d181e181ed87a80001aec4b55e4ff825839011d1bada644161aca13dbdd459e22f56de9960e1b14000e02c9cae14e489f556d86ed882e6c9a9863850733a5ef8f91b76c90723c5428b119821a001e8480a1581ca8f54e6eb47a7ef6d96aceb892f4e9b6211f8b736a1f6d3109648c20a1534f6666696369616c436861726c65736d656d651a00c173f782581d616c8ecf30ba1a025dd324cb0598c8ff87522b324901299cf3f4f1d0b21aaf0211cf021a00094695031a08beb01605a1581df199e5aacf401fed0eb0e2993d72d423947f42342e8f848353d03efe6100081a08bea8460b58201166f1e52636fad1979ef017c8acb2e7d00886b0a1d12f8a8e8cdcd0a9c80bd00d818258200303adff747744cc37c66cb87e1c3dda2b40465700aac5b7c1bf53c2860830cd020e81581c6c8ecf30ba1a025dd324cb0598c8ff87522b324901299cf3f4f1d0b21082581d616c8ecf30ba1a025dd324cb0598c8ff87522b324901299cf3f4f1d0b21aaebf0d24111a004c4b401283825820fa46a1d162c59cece3308c5a9d4db9ff2ea17f9c0146ff821c9b445588b017c900825820f5f1bdfad3eb4d67d2fc36f36f47fc2938cf6f001689184ab320735a28642cf2008258200258ec397cbd4a86951126bd2c423d62f71ec844430964cd0e14df2f951906a400a4008182582095380feb98c503a212eabedc4255de0f9a8413ad27b5c938f70f3da4affabc2a00018282583901e1cd1b4f8ff6348e3e91cd01a8fcc56e6884f2e990101d2a5ddf9a20b95305afd8204f08bca33e387aea8205fdab608f136ba00c69075db5821a0012593aa1581cc04a1c7b912224dd7c0474ad884576d1ca86235001b931e3391cf379a15343617264616e6f666f727468654d61343632350182583901a14e185c943455785921caf1a390e7c4c06c712d993fca257c6522d551fe5d2c1c57a6729a1fd21c78be212df620879bb8a157785f7977a3821a00280bb9a1581cc04a1c7b912224dd7c0474ad884576d1ca86235001b931e3391cf379a15343617264616e6f666f727468654d613430343701021a0002a40d031a08bec82382a300818258203c7c0170cbf29f52bf5b7c9230864da765f1de40af276938d5c113ceea2674b0584027d86442c29176ec555ad48ec4bc6e37e9c853b12a3504af3d0582593f1c7afa7b4e8273c2a359e8f293d15e352f81f327becdd2e1ca715618f292240f6d070806815901455901420100003323232323232322322253330053253330063370e900218039baa300130083754004264a66600e66e1d2000300837540022646600200264a66601266e1d2002300a3754002297adef6c6013756601c60166ea8004c8cc004004dd5980218059baa300e300b375400644a66601a0022980103d87a80001323232533300d3371e0166eb8c03800c4cdd2a4000660226e980052f5c026600a00a0046eacc038008c044008c03c004894ccc030004528099299980519b873371c6eb8c02cc03c00920024806852889980180180098078008b1929998050008a6103d87a800013374a9000198059806000a5eb80dd618059806180618041baa300b3008375400429408c02cc03000452613656375c002ae6955ceaab9e5573eae815d0aba24c011e581ce0302560ced2fdcbfcb2602697df970cd0d6a38f94b32703f51c312b00010583840001d8798082196ec71a007e3127840002d87a9fd8799f0018189f9f01d87a8000ffffffff821a0010f6061a15142f6d840300d8798082199f5f1a00bc09d0a1008182582035c710492aa6b7e611fe7e438506cdd2afab57da18b9f55e38db67a1866e1f605840c1c3470080e8c4ad68c5b2870bf28885bcff25afbee58a3d4e6eef12adb9e47eac7726263c35bde44a4102ffccf48f1d577afd406fd798d2992a92c880f8300ba080
+
+---
+
+*conway.ConwayBlock
+era:  7
+slot: 146713650
+hash: 1ae87e65acdc1d70898460f79209198f363b66ec051fb8f6581fafdc743fe174 FOUND
+txs:  2
+
+- tx 0
+  hash: db8895edcaa06fc97a6d4afbbfa5d0eaa1cb9312cf240e5e0adce2f0f2618dd1 FOUND
+
+- tx 1
+  hash: d89eb38a21c8ab0c838785c4cf80d47def70a922563b30f6e410e13238be86f2 FOUND
+
+85828a1a00ae45e11a08beac32582028e3f27f2651340438f726da5921d0e907be3eae4dd85f8ffcaf3aadc3b0c834582077c11d5a179ba18148e5c9d6fd6991f45a501aa2575e9a034403f64e198f264658202a4062aaff3f59132f1eb240904197803835b5633a28e04145f0427a33d6a50f825840bebf421d843b3669601aa1a1d72c944f0839866f325257a7b50494c77540fb1ad42a3d4d293ad326904d80e184d71ff66b5c4a7b64fcff11100eecee24e79ea358503a9d24196fa9013c9cf9d125868332901a7cf55905c4cebd28a7216d33b76c530788840250db3d5be6c5ddb68d1d3cc8516f7dce47e83cdcff567c9b47d3fa13d8bab3019fd8397e9b64c39b10c8f9021907035820f012839c5eb375acef4f5cfa17f4847eb0b2bbf04e0ff03bdc480df3c9fe9484845820ff6489307efc88473e59b74b135762ad438f3a4f9ad58fd0f163c9ef8c918cf2071904605840a7dde6fc236d58237f7bc4aace0fe85f81e8cc1de4ccb2a75cc0f40e854448794073e0d18c98e9fd848159b1720cd3438950f25cc9cceb70fbf571dbe6c0900b820a025901c09b8cc3fd605f91eff72a7d6b1b2c4f170fb8f83702529f81ddc4d843f27ad77e47c48ad3c9b8ccf7a877fe15ac691d3c302636b90874ce7626e922c0fad39f05274f03f2834e1c7bf2a355843945e9aa79094d614e05645c41a6fec377d25a85b459a4122f3d123eac66ce5d3be7f353a2d419a72acdb05610a7048f32777be5d62c38552e07109b53570e9c487fe874a0af7d3648422f55ea7e8e3fac3b816541d1d6d11230a1d14e7862a47ebfc36ad0c2264f9cd6f28309626b253418f303a2fd75d2e404b6c9394486ed661b8027e4abea56368f88cfffd1cedfc84355e6665ca9b50ebc351738aaa826de78d6fa18b8aef10efebbdbe81ad074d5fe05acaa6ba48caadae10d0a19f4ce0a59f1a9f35cbcb5b541fc497764b8d5ffbd202bffd7205cc7692c384c69891a10539bbb48f4969c4ce54f7889ac286ffe98a71c2dd46d96b19441dcde9dfc3ae3a6c3ecfea3d04babb70930a55db32b15aea24811b39b16775aeeca4735f3d5c9396c11061e0953c986d8d3f5de921ae729f12c27eabd0a96b9290c7b901ed0bcf20b87e02b07e778ebb5f43f2a3db4bdf61623887f75ef3b1183b18693e24b860f21758d94135fc62aeeb0f565b5d6d25e468782ac00838258200303adff747744cc37c66cb87e1c3dda2b40465700aac5b7c1bf53c2860830cd02825820d6183807f2679dafe2c02aafd823dea01960fc4af27e1c1fac089dca6cc82e2a00825820e0a4aa807b8b3bb8d4e50bd826c424f72a2caf2ca028ba34b44ab11caf48d3ec000183a300583911e0302560ced2fdcbfcb2602697df970cd0d6a38f94b32703f51c312bbc10fe312acd69e2e12cbc2cca05aa0e432e3dee65d5a9498344e4aa01821b00000001708719bda2581ca8f54e6eb47a7ef6d96aceb892f4e9b6211f8b736a1f6d3109648c20a1534f6666696369616c436861726c65736d656d651a100ea6c6581ce0302560ced2fdcbfcb2602697df970cd0d6a38f94b32703f51c312ba15820000de140ad4c0f0d427c258086e0e3ca80916333f12a84a5629f4b4b321ac18601028201d818586ed8799f581cad4c0f0d427c258086e0e3ca80916333f12a84a5629f4b4b321ac1869f9f4040ff9f581ca8f54e6eb47a7ef6d96aceb892f4e9b6211f8b736a1f6d3109648c20534f6666696369616c436861726c65736d656d65ffff1a1fb9417d181e181ed87a80001aec4b55e4ff825839011d1bada644161aca13dbdd459e22f56de9960e1b14000e02c9cae14e489f556d86ed882e6c9a9863850733a5ef8f91b76c90723c5428b119821a001e8480a1581ca8f54e6eb47a7ef6d96aceb892f4e9b6211f8b736a1f6d3109648c20a1534f6666696369616c436861726c65736d656d651a00c173f782581d616c8ecf30ba1a025dd324cb0598c8ff87522b324901299cf3f4f1d0b21aaf0211cf021a00094695031a08beb01605a1581df199e5aacf401fed0eb0e2993d72d423947f42342e8f848353d03efe6100081a08bea8460b58201166f1e52636fad1979ef017c8acb2e7d00886b0a1d12f8a8e8cdcd0a9c80bd00d818258200303adff747744cc37c66cb87e1c3dda2b40465700aac5b7c1bf53c2860830cd020e81581c6c8ecf30ba1a025dd324cb0598c8ff87522b324901299cf3f4f1d0b21082581d616c8ecf30ba1a025dd324cb0598c8ff87522b324901299cf3f4f1d0b21aaebf0d24111a004c4b401283825820fa46a1d162c59cece3308c5a9d4db9ff2ea17f9c0146ff821c9b445588b017c900825820f5f1bdfad3eb4d67d2fc36f36f47fc2938cf6f001689184ab320735a28642cf2008258200258ec397cbd4a86951126bd2c423d62f71ec844430964cd0e14df2f951906a400a4008182582095380feb98c503a212eabedc4255de0f9a8413ad27b5c938f70f3da4affabc2a00018282583901e1cd1b4f8ff6348e3e91cd01a8fcc56e6884f2e990101d2a5ddf9a20b95305afd8204f08bca33e387aea8205fdab608f136ba00c69075db5821a0012593aa1581cc04a1c7b912224dd7c0474ad884576d1ca86235001b931e3391cf379a15343617264616e6f666f727468654d61343632350182583901a14e185c943455785921caf1a390e7c4c06c712d993fca257c6522d551fe5d2c1c57a6729a1fd21c78be212df620879bb8a157785f7977a3821a00280bb9a1581cc04a1c7b912224dd7c0474ad884576d1ca86235001b931e3391cf379a15343617264616e6f666f727468654d613430343701021a0002a40d031a08bec82382a300818258203c7c0170cbf29f52bf5b7c9230864da765f1de40af276938d5c113ceea2674b0584027d86442c29176ec555ad48ec4bc6e37e9c853b12a3504af3d0582593f1c7afa7b4e8273c2a359e8f293d15e352f81f327becdd2e1ca715618f292240f6d070806815901455901420100003323232323232322322253330053253330063370e900218039baa300130083754004264a66600e66e1d2000300837540022646600200264a66601266e1d2002300a3754002297adef6c6013756601c60166ea8004c8cc004004dd5980218059baa300e300b375400644a66601a0022980103d87a80001323232533300d3371e0166eb8c03800c4cdd2a4000660226e980052f5c026600a00a0046eacc038008c044008c03c004894ccc030004528099299980519b873371c6eb8c02cc03c00920024806852889980180180098078008b1929998050008a6103d87a800013374a9000198059806000a5eb80dd618059806180618041baa300b3008375400429408c02cc03000452613656375c002ae6955ceaab9e5573eae815d0aba24c011e581ce0302560ced2fdcbfcb2602697df970cd0d6a38f94b32703f51c312b00010583840001d8798082196ec71a007e3127840002d87a9fd8799f0018189f9f01d87a8000ffffffff821a0010f6061a15142f6d840300d8798082199f5f1a00bc09d0a1008182582035c710492aa6b7e611fe7e438506cdd2afab57da18b9f55e38db67a1866e1f605840c1c3470080e8c4ad68c5b2870bf28885bcff25afbee58a3d4e6eef12adb9e47eac7726263c35bde44a4102ffccf48f1d577afd406fd798d2992a92c880f8300ba080
+```
+
+The explorers are attributing txs from block `a3d` as if it were an ebb, but the lib
+I'm using is telling me it's a normal conway block. Is there an issue with the
+lib?
+
+The transaction hashes are the same??
+
+```
+SELECT * FROM points WHERE slot == 0;
+```
+
+```
+0 89d9b5a5b8ddc8d7e5a6795e9774d97faf1efea59b2caf7eaf9f8c5b32059df4  0 (ebb)
+0 f0f7892b5c333cffc4b3c4344de48af4cc63f55e44936196f365a9ef2244134f  1 (byron)
+```
+
+Let's look at the first shelly block.
+
+```
+16588737 4e9bbbb67e3ae262133d94c3da5bffce7b1127fc436e7433b87668dba34c354a
+``` 
+
+```
+SELECT * FROM points WHERE slot == 16588737;
+SELECT * FROM points WHERE slot < 16588737 ORDER BY slot DESC LIMIT 2;
+SELECT * FROM points WHERE slot > 16588737 ORDER BY slot ASC LIMIT 2;
+```
+
+```
+16588845  d320eb16082133a24b11d00f687a55740a3efddf6de2a104bb826d6113f1bfcd  -1
+16588800  078d102d0247463f91eef69fc77f3fbbf120f3118e68cd5e6a493c15446dbf8c  -1 FOUND
+
+16588737  4e9bbbb67e3ae262133d94c3da5bffce7b1127fc436e7433b87668dba34c354a   shelley genesis
+
+16588719  7fdf13dc47bc43fe921da6a9bff4ff1c95f2a257a93e1a4c58c13ef7df461545  -1 FOUND
+16588702  2772d6484501a4183f3c2376536234c0a27e1da1ed282f9fd1b32890605ee241  -1
+```
+
+---
+
+I've come accross a situation on my mainnet node where it's reporting 2
+points at the same slot with 2 different block hashes, but the same txs. They
+both come back in the gouroborus library as conway blocks type/era 7.
+
+This is what I'm working with:
+
+```
+146713709 a7d9394c9f98bde676f632f2dcc550c036bf3830cfce45f95abe88a934e7b484 √
+146713704 76c47208ad2924cd8ed21ac5b391de610f95c6f60432f7c14fd5216125cbe49a √
+
+146713650 a3d7678d318d9d2f048a50fa669646f3d6cfa0352461d7e68c59ce92c743c7d0 <-- additional?
+146713650 1ae87e65acdc1d70898460f79209198f363b66ec051fb8f6581fafdc743fe174 √
+
+146713646 28e3f27f2651340438f726da5921d0e907be3eae4dd85f8ffcaf3aadc3b0c834 √
+146713633 12c623474331a96253243af38f0e449aeeb41cbe7a00c8c5f676caf6a1dd21ba √
+```
+
+The explorers don't have a reference for block `a3d7...`
+
+```
+*conway.ConwayBlock
+type: 7
+slot: 146713650
+num:  11421153
+hash:    
+txs:  2
+
+- tx 0
+  hash: db8895edcaa06fc97a6d4afbbfa5d0eaa1cb9312cf240e5e0adce2f0f2618dd1
+
+- tx 1
+  hash: d89eb38a21c8ab0c838785c4cf80d47def70a922563b30f6e410e13238be86f2
+
+---
+
+*conway.ConwayBlock
+type: 7
+slot: 146713650
+num:  11421153
+hash: 1ae87e65acdc1d70898460f79209198f363b66ec051fb8f6581fafdc743fe174
+txs:  2
+
+- tx 0
+  hash: db8895edcaa06fc97a6d4afbbfa5d0eaa1cb9312cf240e5e0adce2f0f2618dd1
+
+- tx 1
+  hash: d89eb38a21c8ab0c838785c4cf80d47def70a922563b30f6e410e13238be86f2
+```
+
+Looks like a chain split but my node lets me query the invalid chain.
+
+Looks like the differences are all in the header:
+- IssuerVkey
+- VrfKey
+- VrfResult
+- OperationalCert
+- Signature
+
+If I'm getting chain reorg / rollbacks for the N2N proto, how do I avoid sending
+these to maya, and how should I handle that in the situation where we've gone
+down the wrong chain too far?
+
+Need to make sure the prevhash for double points is checked, in this case it
+was an easy distinction.
+
+```
+SELECT * FROM points WHERE type == -1;
+```
+
+https://cardano.stackexchange.com/questions/9622/how-often-do-we-see-chain-reorgs-in-cardano
+
+> On my cardano-db-sync instance I see a one block reorganisation a couple of
+  times a day. Two block reorgs maybe once a week or month and I have never
+  seen a 3 block reorg. That does not mean they don't happen, just that they
+  are rare.
+
+So let's go 6 blocks back and make sure we have the reorg logic in place for maya.
+
+Okay here's my updated plan:
+
+---
+
+For the following, let's say `K = 6`.
+
+When points come in via the N2N protocol, we write them to the point database.
+
+We store the slot, hash and type for the point rollforward event.
+
+We maintain the last slot number and log a warning if another point comes in
+which matches the last slot and is not a boundary block, this is the start of
+a chain split.
+
+We then select from points where the slot > lastblock.slot, drop the latest K,
+and fetch blocks for the remaining points in the array (if there are any left).
+This means we're always writing blocks and txs K behind the tip to help avoid
+reorgs.
+
+We batch those in groups of 10k points so we don't stress out the cardano node
+and bring everything to a halt if we've not been running for a significant time
+or if this is the first run and we're catching up. (my node didn't handle asking
+for the entire history at once last time I tried)
+
+If a rollback happens and our height is still trailing behind the K window from
+the tip, we update our point index and continue on as if nothing bad happened.
+
+If a rollback happens to a block number behind K from the current tip, to a
+block we'd already have revealed to maya, we update all relevant indexes
+(point/block/txs) and write a reorg event to the database which can later be
+queried by maya and generally used to track things.
+
+---
+
+Need to review the maya rollback logic and make sure we have a test in place
+for this.
+
+Continue refactoring the client tomorrow...
+
+#### 05.02.2025 Wednesday 1h
+
+On the client refactor...
+
+#### 06.02.2025 Thursday 6h
+
+Bit of a db rework again. We are just using the points for both point and block
+data now to save duplicating the hash. So the point is saved first with
+slot|hash|type and later the block height is updated.
+
+Block points and block data are both fetched independently and asynchronously
+now.
+
+I'm going to kill the process and try various things to corrupt it...
+
+```
+SELECT MAX(slot), * FROM point;
+SELECT MAX(height), * FROM point;
+UPDATE point SET height = -1;
+
+```
+
+Switching from GetBlock to GetBlockRange.  
+Took 10k batches from 12-15s to 2-3s.  
+That's better.  
+Given a complete point index, the blocks/txs can be fetched in less than an hour.  
+Acceptable.  
+
+#### 10.02.2025 Monday 3h 30m
+
+...
+
+#### 12.02.2025 Wednesday 6h
+
+I HAVE to maintain the /cli method in order to call utxos for address, do I not?
+
+Trying to use gouroboros utxos instead of mine.  
+version mismatch.  
+
+```
+go get github.com/blinklabs-io/gouroboros
+```
+
+Amazing there's now an interface block.PrevHash func.
+
+Updating privnet cardano node from `9.2.0`  to `10.1.4`.
+
+Yep, that broke my entrypoint.
+
+```
+ln -s $(find /nix/store -type f -name cardano-node -path '*bin*' | head -n 1) /usr/local/bin/
+ln -s $(find /nix/store -type f -name cardano-cli -path '*bin*' | head -n 1) /usr/local/bin/
+```
+
+setting slog debugger to lowest level doesn't help.
+using my proxy to see what's going on.
+
+```
+cefc9468000000448200ab198009182a19800a182a19800b182a19800c182a19800d182a19800e182a19800f82182af419801082182af419801182182af419801282182af419801382182af4
+```
+
+```
+[
+  0,
+  {
+    32777: 42,
+    32778: 42,
+    32779: 42,
+    32780: 42,
+    32781: 42,
+    32782: 42,
+    32783: [
+      42,
+      false
+    ],
+    32784: [
+      42,
+      false
+    ],
+    32785: [
+      42,
+      false
+    ],
+    32786: [
+      42,
+      false
+    ],
+    32787: [
+      42,
+      false
+    ]
+  }
+]
+```
+
+```
+d7199a278000000782028200820d0e
+```
+
+```
+[2, [0, [13, 14]]]
+```
+
+```
+f62bdce0000000338200a80782182af50882182af50982182af50a82182af50b84182af500f40c84182af500f40d84182af500f40e84182af500f4
+```
+
+```
+[0, {7: [42, true], 8: [42, true], 9: [42, true], 10: [42, true], 11: [42, true, 0, false], 12: [42, true, 0, false], 13: [42, true, 0, false], 14: [42, true, 0, false]}]
+```
+
+My node is version 10.1.4 and my gouroboros version is v0.108.2
+
+Right something has clicked. You can use socat to forward tcp to the unix socket.
+
+3030 is testnet ntn
+3031 is testnet ntc
+
+```
+export CARDANO_NODE_SOCKET_PATH=/opt/node.socket
+export CARDANO_NODE_NETWORK_ID=42
+cardano-cli query utxo --address addr_test1vrstfj7x5lldvpfhajfuure6ltj3v6afkn4fzf5egdvvqhq2dth6v --out-file /dev/stdout
+```
+
+Not entirely sure why but with the ntc, you have to redial it every time you
+make a query or it doesn't actually return the latest results. If I reconnect, 
+it gives me the correct utxos, if not, I never see the ones returned using the
+cardano-cli directly.
+
+#### 13.02.2025 Thursday 6h
+
+The block processor doesn't see genesis utxos because they're not retrieved
+when calling get transactions on the genesis block. So we have to manually
+trigger a tx from the genesis utxo back to the faucet address so it can be
+detected.
+
+```
+docker exec -it cardano-privnet sh
+
+export CARDANO_NODE_SOCKET_PATH=/opt/node.socket
+export CARDANO_NODE_NETWORK_ID=42
+cardano-cli query utxo --address addr_test1vrstfj7x5lldvpfhajfuure6ltj3v6afkn4fzf5egdvvqhq2dth6v --out-file /dev/stdout
+cardano-cli query utxo --whole-utxo
+cardano-cli query tx-info 8c78893911a35d7c52104c98e8497a14d7295b4d9bf7811fc1d4e9f449884284
+cardano-cli query utxo --tx-in 8c78893911a35d7c52104c98e8497a14d7295b4d9bf7811fc1d4e9f449884284#0
+cardano-cli query utxo --tx-in 8c78893911a35d7c52104c98e8497a14d7295b4d9bf7811fc1d4e9f449884284#0 --output-json
+```
+
+```
+faucet
+addr_test1vztc80na8320zymhjekl40yjsnxkcvhu58x59mc2fuwvgkc332vxv
+```
+
+```
+cardano-cli conway transaction build \
+  --cardano-mode \
+  --change-address addr_test1vztc80na8320zymhjekl40yjsnxkcvhu58x59mc2fuwvgkc332vxv \
+  --tx-in 8c78893911a35d7c52104c98e8497a14d7295b4d9bf7811fc1d4e9f449884284#0 \
+  --tx-out addr_test1vztc80na8320zymhjekl40yjsnxkcvhu58x59mc2fuwvgkc332vxv+899999829571 \
+  --out-file /tmp/first.unsigned
+
+cardano-cli conway transaction sign \
+    --tx-body-file /tmp/first.unsigned \
+    --signing-key-file /cardano/creds/faucet.sk \
+    --out-file /tmp/first.signed
+
+cardano-cli conway transaction submit --tx-file /tmp/first.signed
+```
+
+```
+export CARDANO_NODE_SOCKET_PATH=/opt/node.socket
+export CARDANO_NODE_NETWORK_ID=42
+
+cat > /tmp/memo.json <<EOF
+{
+  "0": {
+    "1337": {
+      "memo": "this.is.a.test.memo.wow"   
+    }
+  }
+}
+EOF
+
+cardano-cli query utxo --address addr_test1vztc80na8320zymhjekl40yjsnxkcvhu58x59mc2fuwvgkc332vxv --out-file /dev/stdout
+
+cardano-cli conway transaction build \
+  --cardano-mode \
+  --change-address addr_test1vr984kaehpmxlx8vqztryfjpu3578msak7uxvx5l9jlfxjq6wqfv6 \
+  --tx-in 0114a90b6dd59e420dab02c76674f30026be58be252a99bfff389e9f1fab42e3#0 \
+  --tx-out addr_test1vr984kaehpmxlx8vqztryfjpu3578msak7uxvx5l9jlfxjq6wqfv6+2000000 \
+  --out-file /tmp/tx.unsigned \
+  --metadata-json-file /tmp/memo.json
+
+cardano-cli conway transaction sign \
+    --signing-key-file /cardano/creds/faucet.sk \
+    --tx-body-file /tmp/tx.unsigned \
+    --out-file /tmp/tx.signed
+
+cardano-cli conway transaction submit --tx-file /tmp/tx.signed
+
+cardano-cli debug transaction view --tx-file /tmp/tx.signed
+
+cardano-cli conway transaction txid --tx-file /tmp/tx.signed
+```
+
+Okay memo sending / parsing like that is all fine.  
+Building the memo using my handcrafted structs is fine but potentially brittle.  
+There isn't a tx build as part of gouroboros.  
+
+Do the cardano-cli transaction build commands actually contact the node?
+
+```
+socat UNIX-LISTEN:/opt/node.socket2,reuseaddr,fork UNIX-CONNECT:/opt/node.socket &
+socat -lf /dev/stdout -v UNIX-LISTEN:/opt/node.socket2,reuseaddr,fork UNIX-CONNECT:/opt/node.socket &
+
+cardano-cli ping -u /opt/node.socket2 -t -m 42
+```
+
+```
+CARDANO_NODE_SOCKET_PATH=/opt/node.socket2 \
+CARDANO_NODE_NETWORK_ID=42 \
+cardano-cli conway transaction build \
+  --cardano-mode \
+  --change-address addr_test1vr984kaehpmxlx8vqztryfjpu3578msak7uxvx5l9jlfxjq6wqfv6 \
+  --tx-in 2cad61601bdd4ec502388a7b0362ef4fffb8ebcbbf75bf4ff0bee08a6e4b330c#1 \
+  --tx-out addr_test1vr984kaehpmxlx8vqztryfjpu3578msak7uxvx5l9jlfxjq6wqfv6+2000000 \
+  --out-file /dev/stdout \
+  --metadata-json-file /tmp/memo.json
+```
+
+Certainly seems so.  
+Can I proxy that?  
+
+It's a bit convoluted but I need to:
+- run cardano-node with ntn 0.0.0.0:3000 and ntc /opt/node.socket
+- run socat in container exposing unix socket /opt/node.socket on 3001
+- expose ntn 3030:3000 and ntc 3031:3001 via docker ports on osx host
+- run proxy on osx host listening on 3033 and forwarding to ntc 3031
+- run socat in container forwarding a unix socket /opt/forward.socket to host.docker.internal:3033
+- run cardano-cli ntc targeting /opt/forward.socket
+
+```
+docker run \
+  -it \
+  --rm \
+  --name cardano-privnet \
+  --entrypoint /scripts/entrypoint-privnet.sh \
+  -p 3030:3000 \
+  -p 3031:3001 \
+  --stop-timeout 60 \
+    registry.gitlab.com/mayachain/devops/node-launcher:cardano-daemon-10.1.4
+
+socat UNIX-LISTEN:/opt/forward.socket,reuseaddr,fork TCP:host.docker.internal:3033 &
+
+CARDANO_NODE_SOCKET_PATH=/opt/forward.socket \
+CARDANO_NODE_NETWORK_ID=42 \
+cardano-cli conway transaction build \
+  --cardano-mode \
+  --change-address addr_test1vr984kaehpmxlx8vqztryfjpu3578msak7uxvx5l9jlfxjq6wqfv6 \
+  --tx-in 2cad61601bdd4ec502388a7b0362ef4fffb8ebcbbf75bf4ff0bee08a6e4b330c#1 \
+  --tx-out addr_test1vr984kaehpmxlx8vqztryfjpu3578msak7uxvx5l9jlfxjq6wqfv6+2000000 \
+  --out-file /dev/stdout \
+  --metadata-json-file /tmp/memo.json
+```
+
+A lot of things just happened. Looks like a load of local state queries for
+maybe network or fee info, the actual tx build logic looks within the cli. Yes
+it imports the cardano-api package directly from the cardano-node haskell repo
+so it shares the same logic as the node. Hmmmm. So we still want to keep the
+cli interactions to make use of the "complex" utxo rebalancing logic.
+
+Why can't we just use gouroboros directly to the node (ntn/ntc)?  
+Keep asking myself this question, and I keep forgetting the answer.
+
+1. If we want to use the cardano-cli (and consequently the core cardano-node api
+logic) we need to have access to the cardano-cli binary, which means running
+another binary somewhere that exposes the cardano-cli binary via rpc (http in
+this case).
+
+2. If we want to stay X blocks behind the current tip, we need to know which
+utxos belong to which block, and we therefore need to maintain a database of
+these relationships. The GetUtxosForAddress doesn't let you filter up to a
+block height X.
+
+3. The cardano-cli doesn't let you query a block by height. As that's how the
+mayanode block followers work, we require height -> point indexes.
+
+I think there are probably other reasons I've forgotten and rediscovered
+multiple times along the way. I'll update this...
+
+Onto cardano tss address generation on mayanode...
+
+> {"level":"fatal","service":"bifrost","error":"chain id len is less than 3","chain":"GAIA","chain_id":"","time":"20:36:57","caller":"/Users/adc/go/src/gitlab.com/mayachain/mayanode/config/config.go:337","message":"chain failed validation"}
+
+Interesting, I've set GAIA_DISABLED=true already.  
+
+Shouldn't even be there, I accidentally merge a viper bind config line which
+created it.  
+
+> linux_syscall.c:67:13: error: call to undeclared function 'setresgid'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]
+
+Tomorrow continue with the tss integration starting with getting the cardano
+address from the tss pubkey...
+
+#### 14.02.2025 Friday 6h
+
+> {"level":"error","service":"bifrost","module":"bifrost","error":"fail to create block scanner: Post \"http://127.0.0.1:18443\": dial tcp 127.0.0.1:18443: connect: connection refused","chain":"BTC","time":"13:50:28","caller":"/Users/adc/go/src/gitlab.com/mayachain/mayanode/bifrost/pkg/chainclients/loadchains.go:90","message":"failed to load chain"}
+
+Again, I have `BTC_DISABLED=true` why he doooo this??!
+
+> {"level":"fatal","service":"bifrost","time":"13:50:28","caller":"/Users/adc/go/src/gitlab.com/mayachain/mayanode/cmd/bifrost/main.go:196","message":"fail to load any chains"}
+
+Oh he crazy:
+
+> {"level":"error","service":"bifrost","module":"bifrost","error":"fail to get chain id ,err: Post \"http://127.0.0.1:8545\": dial tcp 127.0.0.1:8545: connect: connection refused","chain":"ETH","time":"13:50:27","caller":"/Users/adc/go/src/gitlab.com/mayachain/mayanode/bifrost/pkg/chainclients/loadchains.go:90","message":"failed to load chain"}
+
+Doesn't seem to like any of these disabled messages and blindly attempts to
+connect anyway 🙈
+
+Added missing viper env binds. For those.
+
+Going to make an IMPORTANT DISTINCTION here between `tip` and `height`:
+
+The rpc tip is the `point` which our `chainsync` follower has reached.  
+Bear in mind the ntn `chainsync` and `blockfetch` protocols run independently
+of each other so we know the next `point` first, which we then use to fetch the
+`block`.  
+With the rpc interface the `height` is the most recent `block` fetched.  
+The node itself will be on a higher `point`/`tip` than our rpc `tip`.  
+And our `chainsync` logic will trail behind the node by a point or so due to
+network and processing delay.  
+We fetch blocks 6 points behind that `tip`.  
+So our `height` is actually the node `tip` plus ntn network delay to give our
+follower `tip` plus the 6 point trailing reorg window plus the time it takes us
+to actually fetch and parse the block from `blockfetch`.
+
+To avoid confusion I'm going to remove `GetTip` from the rpc client altogether
+and just leave `GetHeight`.
+
+NOTE: The `/height` endpoint response will go through this sequence while
+starting:
+- ECONNREFUSED - before the binary has launched
+- 404 "Block processor starting..." - if we're loading from genesis to the tip
+- PointRef - the actual height of the block processor
+
+> fail to get current block scan pos, ADA will start from 21
+
+```
+go: downloading github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0
+go: finding module for package github.com/btcsuite/btcd/btcec
+go: gitlab.com/mayachain/mayanode/bifrost/pkg/chainclients/bitcoin imports
+  github.com/btcsuite/btcd/btcec: module github.com/btcsuite/btcd@latest found (v0.24.2), but does not contain package github.com/btcsuite/btcd/btcec
+```
+
+```
+sed -i '' 's|/var/data/bifrost|/Users/adc/.mayanode/bifrost|g' ./config/default.yaml
+```
+
+Had a bit of a dependency tangle there.
+
+```
+git checkout go.mod go.sum
+go mod edit -replace github.com/btcsuite/btcd=github.com/btcsuite/btcd@v0.22.1
+go mod edit -replace github.com/alexdcox/cardano-go@v0.1.7=/Users/adc/code/cardano-go
+go mod tidy
+```
+
+Build command is coming back with this:  
+
+> Error: The transaction does balance in its use of ada, however the net balance does not meet the minimum UTxO threshold. 
+> Balance: 29571 Lovelace
+> Offending output (change output): addr_test1vr984kaehpmxlx8vqztryfjpu3578msak7uxvx5l9jlfxjq6wqfv6 + 29571 lovelace
+> Minimum UTxO threshold: 849070 Lovelace
+> The usual solution is to provide more inputs, or inputs with more ada to meet the minimum UTxO threshold
+
+Where's that in the protocol params?  
+
+Ah the base tx size is 160. They call it constant overhead:  
+`cardano-ledger/eras/babbage/impl/src/Cardano/Ledger/Babbage/TxOut.hs:618`
+
+Say I have a tx: `c9e9e7a1f4c27c2fae3bf3603e3758d9f20f9d64be54608892ffa16b5dfd576d`
+
+Too late day's over.
+
+#### 18.02.2025 Tuesday 6h 30m
+
+`Number` and `Content` come from `cbor.Tag`.
+
+REMINDER: `UnmarshalJSON` MUST use a pointer. `MarshalJSON` can use either (does it matter?)
+
+The `getUTXOs` func in the bifrost client needs a height.
+
+Might be able to speed up the build rpc by using ledger for the txhash instead
+of the txid command.
+
+```
+84a400d9010281825820f45d35ce6326ffbead0869bee6a23ef4ac737e2c16b7d79289c759da149c930e00018282581d60429f5a96edec976bcb5fe817e3e186fe4fa1538ae88cca3a184a0dad1a000f424082581d6014c97b3b192465b1ec506d79fd08dc508e15471b5e9e01c15c6cf0981a0086b10f021a0002a331075820ac815c2470afcd09758bc83a9861ca89392aa3e70f6a8b8ff925a39b3b11b416a0f5d90103a100a100a1190539a1646d656d6f67636865636b6d65
+```
+
+-172717 min fee?
+
+Maybe I should parse the cli errors? They're already in the rpc log though.
+
+> Command failed: transaction build  Error: The UTxO is empty
+
+Continue tomorrow with updated rpc demo code and finalising bifrost client...  
+Think about estimate fee, re-read docs...  
+
+
+#### 19.02.2025 Wednesday 6h
+
+> Command failed: transaction submit  Error: Error while submitting tx: ShelleyTxValidationError ShelleyBasedEraConway (ApplyTxError (ConwayUtxowFailure (ConflictingMetadataHash (AuxiliaryDataHash {unsafeAuxiliaryDataHash = SafeHash "4b0c211c8712e50ef06aae90090d2ccb3d0afcc1c4773d0221d4155aeb44b92d"}) (AuxiliaryDataHash {unsafeAuxiliaryDataHash = SafeHash "ba514b0007befe2dc41aea0bfe7676eb6c3a22e8bdd6beb04c2ceb2746c293ae"})) :| []))
+
+```
+84a400d901028182582009bc5295d06264a67d957cd0af08073293750a1b4282174009f9a85a0b9c521c00018282581d608293f4fab87ce7e1319e4581a33e821c118ef844590ebda9b6be46bb1a001e848082581d60e0b4cbc6a7fed60537ec93ce0f3afae5166ba9b4ea9126994358c05c1b000000d18bfd689c021a0002a3890758204b0c211c8712e50ef06aae90090d2ccb3d0afcc1c4773d0221d4155aeb44b92da0f5d90103a100a100a1190539a1646d656d6f69746573742e6d656d6f
+```
+
+```
+[
+  {
+    0: 258([
+      [
+        h'09BC5295D06264A67D957CD0AF08073293750A1B4282174009F9A85A0B9C521C',
+        0
+      ]
+    ]),
+    1: [
+      [
+        h'608293F4FAB87CE7E1319E4581A33E821C118EF844590EBDA9B6BE46BB',
+        2000000
+      ],
+      [
+        h'60E0B4CBC6A7FED60537EC93CE0F3AFAE5166BA9B4EA9126994358C05C',
+        899996805276
+      ]
+    ],
+    2: 172937,
+    7: h'4B0C211C8712E50EF06AAE90090D2CCB3D0AFCC1C4773D0221D4155AEB44B92D'
+  },
+  {
+    
+  },
+  true,
+  259({
+    0: {
+      0: {
+        1337: {
+          "memo": "test.memo"
+        }
+      }
+    }
+  })
+]
+```
+
+```
+[
+  {
+    0: 258([
+      [
+        h'09BC5295D06264A67D957CD0AF08073293750A1B4282174009F9A85A0B9C521C',
+        0
+      ]
+    ]),
+    1: [
+      [
+        h'608293F4FAB87CE7E1319E4581A33E821C118EF844590EBDA9B6BE46BB',
+        2000000
+      ],
+      [
+        h'60E0B4CBC6A7FED60537EC93CE0F3AFAE5166BA9B4EA9126994358C05C',
+        899996805276
+      ]
+    ],
+    2: 172937,
+    7: h'4B0C211C8712E50EF06AAE90090D2CCB3D0AFCC1C4773D0221D4155AEB44B92D'
+  },
+  {
+    0: [
+      [
+        h'13B8C139DE73F80946B40292F5FA4F83B9B0F7747E859BE4AE512F4333E4DBCF',
+        h'34C19E44F43E6160D702D8672ADD927D6BA0E7AA866FA49B9A2318D41C73EB2E5049E746FA68996AACE69C1019C807E495208E07C3FF99A0568217F5F1ABFE08'
+      ]
+    ]
+  },
+  true,
+  {
+    0: {
+      0: {
+        1337: {
+          "memo": "test.memo"
+        }
+      }
+    }
+  }
+]
+```
+
+Oh dang it I do need that cbor tag after all it changes the hash to drop it.  
+That sorted it.  
+Adding the cardano max string size and chunking logic for long memos to js array.  
+
+The memo is now split to an array and reconstituted on the rpc side so the maya
+client doesn't need to worry about that.
+
+The `TxSubmission` now seems to unmarshal/marshal cbor correctly with tags,
+ensuring the aux data hash matches.
+
+inbound_addresses...
+
+> "error": "rpc error: code = Unknown desc = fail to get address for chain: vault has no eddsa public key"
+
+for the `.../vaults/asgard` endpoint we can see ADA coming back in the `chains`
+attribute but no address is returned.
+
+string pub_key_eddsa is not set on the vault for some reason  
+When is that set?  
+
+- ValidatorMgrV110:BeginBlock
+- KVStore:GetAsgardVaultsByStatus
+- KVStore:GetAsgardVaults
+- KVStore:GetVault
+- KVStore:getVault
+- Vault:Unmarshal
+
+In unmarshal we're getting the secp pubkey:
+`tmayapub1addwnpepqfjlpvyacvhe5vwac2d7m29fvcqlw23yck73pasdegj4drdds7y0wdzfymx`
+
+Which can be found in the mayanode `genesis.json` under:  
+`.app_state.mayachain.node_accounts[0].pub_key_set.secp256k1`  
+
+We have a `ed25519` key also in that `pub_key_set`.
+
+We're seeminly getting keys in `GetAsgardVaults` with a func called
+`KVStore:getAsgardIndex(cosmos.Context)`. It's only returning a single key atm.
+
+That calls a func `KVStore.GetKey(...)` which returns a single key.
+
+I don't know why it's called "index" rather than "key" or something that
+indicates it's part of a keypair? We have `prefixVaultAsgardEDDSAIndex` now too.
+So I'll try adding that.
+
+Now that returns an empty slice for the eddsa index, so must have to set it
+somewhere else.
+
+There's `KVStore:addAsgardIndex` and `KVStore:RemoveFromAsgardIndex` that reference
+the other key `prefixVaultAsgardEDDSAIndex`.
+
+Note don't get distracted with KVStore keys and DSA keys. We store the latter
+within the former.
+
+In the cosmos sdk there's a `types.InterfaceRegistry`.  
+It has a `typeURLMap map[string]reflect.Type`.  
+
+```
+0 = /cosmos.crypto.multisig.LegacyAminoPubKey -> 
+5 = /cosmos.crypto.ed25519.PubKey -> 
+31 = /types.MsgSetNodeKeys -> 
+43 = /types.MsgTssKeysignFail -> 
+72 = /cosmos.crypto.secp256k1.PubKey -> 
+81 = /cosmos.crypto.secp256r1.PubKey -> 
+```
+
+Looks like it has the ed25519 key though. Hmm.
+
+I'm looking in:
+- KVStore:GetAsgardVaults
+- KVStore:getAsgardIndex
+- KVStore:getStrings
+
+The `KVStore` uses `github.com/tendermint/tm-db` behind the scenes.
+
+Keys are:
+`vault_asgard_index//`
+`vault_asgard_eddsa_index//`
+
+It doesn't have the second key, and returns false from `KVStore:getStrings`.
+
+The only places the original key is mentioned are:
+- getAsgardIndex
+- addAsgardIndex
+- RemoveFromAsgardIndex
+
+I've added breakpoints in all locations that is set. None are hit.  
+I added logging in all places in case it's part of the genesis.  
+Nothing.  
+
+🤔
+
+We're on cosmos `v0.45.9`.  
+`vault_asgard_index` is not in the .mayanode dir (at least in plain text).  
+The cosmos ctx returns a `github.com/cosmos/cosmos-sdk/store/gaskv:KVStore`.  
+
+Ahh `NetworkMgrVCUR:processGenesisSetup` calls `NewVault(...)` and I already
+have a todo in there to switch to NewVaultV2!
+
+Didn't fix this issue.
+
+Maybe `KVStore:setVault` needs both keys?  
+Nah don't think so, the `record` is the entire `Vault` including `PubKeyEddsa`
+(which is set at this time)
+
+It's `KVStore:getAsgardIndex` where the issue lies. It's returning the first
+key but not the second after calling `KVStore:getStrings`.
+
+Here's some logging:
+
+```
+@KVStore:getAsgardIndex
+@KVStore:getAsgardIndex
+@KVStore:getAsgardIndex
+@KVStore:getAsgardIndex
+@KVStore:addAsgardIndex | pubkey tmayapub1addwnpepqdfxlm9cp5fn60scddh0nr0kw49yyhku7dh0jz64gpxddkn47mpc2plpldx@KVStore:getAsgardIndex
+@KVStore:setStrings | key vault_asgard_index// | records tmayapub1addwnpepqdfxlm9cp5fn60scddh0nr0kw49yyhku7dh0jz64gpxddkn47mpc2plpldx
+@KVStore:setStrings | key vault_asgard_eddsa_index//TMAYAPUB1ZCJDUEPQ8HY4GVZA7UQN98QET2QKUMK7G52AYMD7GVNDWJ3QY3ATFWDDHWGSVLY59J | records tmayapub1addwnpepqdfxlm9cp5fn60scddh0nr0kw49yyhku7dh0jz64gpxddkn47mpc2plpldx
+@KVStore:getAsgardIndex
+@PubKey:GetAddress | chain MAYA | pubkey tmayapub1addwnpepqdfxlm9cp5fn60scddh0nr0kw49yyhku7dh0jz64gpxddkn47mpc2plpldx
+@KVStore:getAsgardIndex
+```
+
+Well that `vault_asgard_eddsa_index` key looks well and truly borked 😵
+
+```
+@KVStore:getAsgardIndex
+@KVStore:getAsgardIndex
+@KVStore:getAsgardIndex
+@KVStore:getAsgardIndex
+@KVStore:addAsgardIndex | pubkey tmayapub1addwnpepqgv48zqla7f3750xu8hf5qsegd8ju7tfdtwy0js0txzd8cyts8k8cu7v7qh
+@KVStore:getAsgardIndex
+@KVStore:setStrings | key vault_asgard_index// | records tmayapub1addwnpepqgv48zqla7f3750xu8hf5qsegd8ju7tfdtwy0js0txzd8cyts8k8cu7v7qh
+@KVStore:addAsgardEDDSAIndex | pubkey tmayapub1zcjduepqdyctxm5ds25jzpx0v6dhkur6c8ysat2d365xg04ytr4v4ryslgyqn5zauv
+@KVStore:setStrings | key vault_asgard_eddsa_index// | records tmayapub1zcjduepqdyctxm5ds25jzpx0v6dhkur6c8ysat2d365xg04ytr4v4ryslgyqn5zauv
+@KVStore:getAsgardIndex
+@KVStore:getAsgardIndex
+```
+
+That's better. Onto the next problem:
+
+```
+6:34PM ERR x/mayachain/manager_validator_v110.go:64 > Failed to get Asgard vaults error="vault with pubkey(tmayapub1zcjduepqdyctxm5ds25jzpx0v6dhkur6c8ysat2d365xg04ytr4v4ryslgyqn5zauv) doesn't exist: vault not found"
+6:34PM ERR x/mayachain/module.go:209 > Fail to begin block on validator error="vault with pubkey(tmayapub1zcjduepqdyctxm5ds25jzpx0v6dhkur6c8ysat2d365xg04ytr4v4ryslgyqn5zauv) doesn't exist: vault not found"
+6:34PM ERR x/mayachain/helpers.go:1789 > fail to get vaults for atTVLCap error="vault with pubkey(tmayapub1zcjduepqdyc
+```
+
+I think there's something going on with fetching the vault from the KVStore.  
+They're indexed by scep only atm?  
+
+Yeah the whole index/key kvstore has clicked in my tiny mind.
+
+Bloody beautiful.
+
+```
+{
+    "chain": "ADA",
+    "pub_key": "tmayapub1addwnpepqg9l8zmvzsc8ul49wujary95cflrm0dqrrjfvjg0d9eg4zxy7nwmk9v6jcy",
+    "address": "addr_test1vpsdte82dm9s0jwjjja0a2rr2mmwnz3wg5hc7m60trgt86sk8lgxy",
+    "halted": false,
+    "global_trading_paused": false,
+    "chain_trading_paused": false,
+    "chain_lp_actions_paused": false,
+    "gas_rate": "2000000000",
+    "gas_rate_units": "lovelace",
+    "outbound_tx_size": "0",
+    "outbound_fee": "2000000000",
+    "dust_threshold": "0"
+}
+```
+
+More like jUcy amirite 🫣 It's been a long day.  
+Now to test a swap.  
+How do I do that again?  
+
+Continue with test script tomorrow...
+
+#### 20.02.2025 Thursday 1h 10m
+
+```
+[
+  {
+    "txHash": "5fd885d865c114f96226e1d870b6d5ba160ce6dc2745209c8a54fb3e280680b1",
+    "address": "addr_test1vrc6vupyvjnm8ax8cytn3s0lnfs6ez7xmv7twt8swhtra4c8gj35k",
+    "amount": 899998978213,
+    "index": 0,
+    "height": 651
+  }
+]
+```
+
+Taking a leaf out of my thornode days here...
+
+continue from docker compose...
+
+#### 23.02.2025 Sunday 3h
+
+```bash
+cd build/docker
+
+while true; do
+  docker compose \
+    --profile mocknet \
+    --profile midgard \
+    up \
+      --scale kuji=0 \
+      --scale ethereum=0 \
+      --scale bitcoin=0 \
+      --scale radix=0 \
+      --scale dash1=1 \
+      --scale dash2=1 \
+      --scale dash3=1 \
+      --scale dash4=1 \
+      --scale thorchain=0 \
+      --scale avalanche=0 \
+      --scale arbitrum=0 \
+      --scale binance=0 \
+      --scale cardano=1 \
+      --remove-orphans \
+      --detach
+  echo -n "Press enter to STOP mayanode cluster..."
+  read ignored
+
+  docker compose \
+    --profile mocknet \
+    --profile midgard \
+    down \
+      --volumes
+  echo -n "Press enter to RESTART mayanode cluster..."
+  read ignored
+done
+```
+
+Do we let it build maya/bf?
+
+```
+    --scale mayanode=0 \
+    --scale bifrost=0 \
+```
+
+Keep getting incorrect password for my mnemonic for some reason??  
+I'll generate a new one...  
+
+```
+docker exec -it -w /root/.mayanode mayanode1 sh
+mayanode keys add alex
+
+find dress crazy disease youth picnic steak obscure property magic phrase fiber follow book brief orange recall good ecology glance bean quantum cave essay
+```
+
+```
+mayanode --log_level trace keys add alex --keyring-backend file --recover
+printf "find dress crazy disease youth picnic steak obscure property magic phrase fiber follow book brief orange recall good ecology glance bean quantum cave essay\npassword\n" | mayanode keys add alex --keyring-backend file --recover
+echo "find dress crazy disease youth picnic steak obscure property magic phrase fiber follow book brief orange recall good ecology glance bean quantum cave essay" | mayanode keys add alex --keyring-backend file --recover
+```
+
+WTF.  
+Can't reimport the new one either.  
+
+Ohhhh I always thought each key had it's own password, but no the entire keyring
+shares the same password, which is `1passw0rd1`.
+
+```
+pass="1passw0rd1"
+printf "\n$pass\n" | mayanode keys add alex --keyring-backend file
+mayaAddress1=$(printf "$pass\n" | mayanode keys show alex --keyring-backend file --output json)
+```
+
+Maybe if I wait for the mayachain to start up first?
+
+Right, I'm at this `demotest.sh`...
+
+- [ ] create / fund maya wallet
+- [ ] create cardano pool
+- [ ] create dash pool
+- [ ] swap ada to dash
+- [ ] swap dash to ada
+
+add:ada.ada:tmaya1wep80ynx5m4n26h4uvj9yrlvlc0q6jjcsmdudu
+6164643a646173682e646173683a746d617961317765703830796e78356d346e3236683475766a3979726c766c633071366a6a63736d64756475
+
+Not getting an ADA inbound address for the mayanode docker image now.
+
+Go mod failed due to go version.  
+Updating `Dockerfile.builder` again and rebuilding `builder-v6`.  
+
+```
+go mod vendor
+rm -rf ./vendor/github.com/alexdcox/cardano-go/*.db
+rm -rf ./vendor/github.com/alexdcox/cardano-go/*.db.bak
+make build-mocknet
+```
+
+The vendor is important as I've got a go mod replace directive targeting a local
+unrelease package.
+
+> failed to solve: process "/bin/sh -c go mod download" did not complete successfully: exit code: 1
+> make: *** [Makefile:294: build-mocknet] Error 17
+
+why? where's my error?
+
+> 4.317 go: github.com/alexdcox/cardano-go@v0.1.7 (replaced by /Users/adc/code/cardano-go): reading /Users/adc/code/cardano-go/go.mod: open /Users/adc/code/cardano-go/go.mod: no such file or directory
+
+gaddamnit I'll just push it
+
+```
+replace github.com/alexdcox/cardano-go v0.1.8 => /Users/adc/code/cardano-go
+```
+
+```
+41.97 /usr/bin/ld: skipping incompatible /app/lib/libradix_engine_toolkit_uniffi.so when searching for -lradix_engine_toolkit_uniffi
+41.97 /usr/bin/ld: skipping incompatible /app/lib/libradix_engine_toolkit_uniffi.so when searching for -lradix_engine_toolkit_uniffi
+41.97 collect2: error: ld returned 1 exit status
+[+] Building 0/2
+ ⠇ Service mayanode  Building                                                                                                                                                                                                                                                                              79.7s
+ ⠇ Service bifrost   Building                                                                                                                                                                                                                                                                              79.7s
+failed to solve: process "/bin/sh -c CC=musl-gcc make install" did not complete successfully: exit code: 2
+make: *** [Makefile:294: build-mocknet] Error 17
+```
+
+
+
+
+
+
+
+
 
 
