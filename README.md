@@ -11199,7 +11199,44 @@ Gima asked for all changes to be pushed so here we go:
 ### Batch Four
 
 ```
-TODO: hours breakdown
+19.11.2024 Tuesday     8h 30m
+27.11.2024 Wednesday   4h
+28.11.2024 Thursday    1h
+03.01.2025 Friday      6h
+20.01.2025 Monday      1h 30m
+21.01.2025 Tuesday     2h
+22.01.2025 Wednesday   6h
+23.01.2025 Thursday    6h
+24.01.2025 Friday      6h
+27.01.2025 Monday      6h
+28.01.2025 Tuesday     2h
+30.01.2025 Thursday    6h
+05.02.2025 Wednesday   1h
+06.02.2025 Thursday    6h
+10.02.2025 Monday      3h 30m
+12.02.2025 Wednesday   6h
+13.02.2025 Thursday    6h
+14.02.2025 Friday      6h
+18.02.2025 Tuesday     6h 30m
+19.02.2025 Wednesday   6h
+20.02.2025 Thursday    1h 10m
+23.02.2025 Sunday      3h
+25.02.2025 Tuesday     6h
+26.02.2025 Wednesday   6h
+27.02.2025 Thursday    6h
+28.02.2025 Friday      6h
+01.03.2025 Saturday    1h
+02.02.2025 Sunday      5h
+04.02.2025 Tuesday     5h 40m
+05.03.2025 Wednesday   4h
+09.03.2025 Sunday      5h
+11.03.2025 Tuesday     8h
+12.03.2025 Wednesday   2h
+13.03.2025 Thursday    6h
+14.03.2025 Friday      4h 10m
+16.03.2025 Sunday      2h
+
+Total                  167h
 ```
 
 #### 19.11.2024 Tuesday 8h 30m
@@ -12524,20 +12561,6 @@ Cosmos still complains that eddsa shouldn't be used for app stuff.
 make test 2>&1 | ggrep -v "ignoring duplicate libraries\|no test\|cgo-gcc-prolog\|has been explicitly marked deprecated here\|first deprecated in macOS\|In file included from"
 ```
 
-Rant: SIMPLICITY VS WORKLOAD
-
-Don't worry, I'm writing this while the tests run so it's not like I'm wasting
-time. Is it better to have a load of copypasta which is easier to understand
-but appears in multiple places and is more volume to read, vs a more DRY
-solution that might take a little longer to understand (ideally not by much)
-but condenses everything into a small footprint which requires less developer
-changes to augment with improvements down the line? I'm clearly in favour of
-the latter. It might take one developer more time to read, but once understood,
-there's just less body of code to review in future for maintainers. I get that
-tests should be small and isolated and clear, but I think we can stretch to
-looping over an array of test cases and including the switch/case statements to
-handle edge cases, so long as it's results in a compact test.
-
 Tests passing.
 
 - [x] common/pubkey_mainnet_test - missing test case
@@ -12712,8 +12735,8 @@ Going to take just under ~20h to complete the index at that rate. Not great.
 
 It's been running a while now. The duration for each batch shows some crazy differences:
 
-> batch 6550000 took 5m10.724322708s from slot slot: 51391818 | hash: a560c8f090c0e7c56fd267b9decf14212e72a67e1f19cc8b25e03c13383a25a1 to slot slot: 51547933 | hash: 8d4b0ce9f386cd003a26d09fc341eba4e172970669602304a2365e4ac7539538
-> batch 6550031 took 111.389583ms from slot slot: 51547951 | hash: 9a077b8eac63f18f84f9114451aefd91f32fcc5d2855ce998988b30cd5531d49 to slot slot: 51548802 | hash: b98c0e48d2a187ec56407a240fc7efc431ac4fa020594c54e38415aecb5a7939
+> batch 6550000 took 5m10.724322708s from slot slot: 51391818 | hash: a560c8f090c0e7c56fd267b9decf14212e72a67e1f19cc8b25e03c13383a25a1 to slot slot: 51547933 | hash: 8d4b0ce9f386cd003a26d09fc341eba4e172970669602304a2365e4ac7539538  
+> batch 6550031 took 111.389583ms from slot slot: 51547951 | hash: 9a077b8eac63f18f84f9114451aefd91f32fcc5d2855ce998988b30cd5531d49 to slot slot: 51548802 | hash: b98c0e48d2a187ec56407a240fc7efc431ac4fa020594c54e38415aecb5a7939  
 
 5m to 0.1s really? Are we caught up?
 
@@ -13847,12 +13870,2479 @@ failed to solve: process "/bin/sh -c CC=musl-gcc make install" did not complete 
 make: *** [Makefile:294: build-mocknet] Error 17
 ```
 
+#### 25.02.2025 Tuesday 6h
+
+Pushing these notes first...
+
+Right back to building the docker image so I can try this `demotest.sh` with
+commands to try a manual swap.
+
+```
+make build-mocknet
+```
+
+```
+cd ./ci
+make builder
+```
+
+> ln: failed to create symbolic link '/usr/include/x86_64-linux-musl/': No such file or directory
+
+> no such option: --break-system-packages
+
+> /go/pkg/mod/github.com/zondax/hid@v0.9.0/libusb/libusb/os/linux_usbfs.h:24:10: fatal error: linux/types.h: No such file or directory
+
+```
+docker run -it --rm --name ttt --entrypoint bash ttt
+
+apk add linux-headers sqlite-dev
+
+export NOW=$(date +'%Y-%m-%d_%T')
+export VERSION=$(cat version)
+export COMMIT=$(git log -1 --format='%H')
+export TAG=mocknet
+
+wget https://github.com/radixdlt/radix-engine-toolkit-go/releases/download/v2.1.1/libradix_engine_toolkit_uniffi_aarch64_unknown_linux_gnu.tar.gz
+tar -xvf libradix_engine_toolkit*.tar.gz
+mv radix-engine-toolkit-*/libradix_engine_toolkit_uniffi.so /app/lib/libradix_engine_toolkit_uniffi.so
+rm -rf radix* libradix*
+
+CC=musl-gcc \
+CGO_LDFLAGS="-L$(pwd)/lib -lradix_engine_toolkit_uniffi" \
+CGO_CFLAGS="-D_LARGEFILE64_SOURCE" \
+CGO_ENABLED=1 \
+LD_LIBRARY_PATH="$(pwd)/lib" \ go install -ldflags "\
+  -X gitlab.com/mayachain/mayanode/constants.Version=$VERSION \
+  -X gitlab.com/mayachain/mayanode/constants.GitCommit=$COMMIT \
+  -X gitlab.com/mayachain/mayanode/constants.BuildTime=$NOW \
+  -X github.com/cosmos/cosmos-sdk/version.Name=MAYAChain \
+  -X github.com/cosmos/cosmos-sdk/version.AppName=mayanode \
+  -X github.com/cosmos/cosmos-sdk/version.Version=$VERSION \
+  -X github.com/cosmos/cosmos-sdk/version.Commit=$COMMIT \
+  -X github.com/cosmos/cosmos-sdk/version.BuildTags=$TAG \
+" ./cmd/mayanode ./cmd/bifrost ./tools/generate
+
+CC=musl-gcc \
+CGO_LDFLAGS="
+  -L$(pwd)/lib -lradix_engine_toolkit_uniffi
+  -X gitlab.com/mayachain/mayanode/constants.Version=$VERSION
+  -X gitlab.com/mayachain/mayanode/constants.GitCommit=$COMMIT
+  -X gitlab.com/mayachain/mayanode/constants.BuildTime=$NOW
+  -X github.com/cosmos/cosmos-sdk/version.Name=MAYAChain
+  -X github.com/cosmos/cosmos-sdk/version.AppName=mayanode
+  -X github.com/cosmos/cosmos-sdk/version.Version=$VERSION
+  -X github.com/cosmos/cosmos-sdk/version.Commit=$COMMIT
+  -X github.com/cosmos/cosmos-sdk/version.BuildTags=$TAG
+" \
+CGO_ENABLED=1 \
+LD_LIBRARY_PATH="$(pwd)/lib" \
+go install ./cmd/mayanode ./cmd/bifrost ./tools/generate
+
+go build ./cmd/mayanode
+```
+
+v1.0.11 of radix FAILED
+
+```
+128.7   running: cd "/app/radix-engine-toolkit/target/release/build/wabt-sys-58bf03d2f6c1321d/out/build" && CMAKE_PREFIX_PATH="" LC_ALL="C" "cmake" "/root/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wabt-sys-0.8.0/wabt" "-DBUILD_TESTS=OFF" "-DBUILD_TOOLS=OFF" "-DCMAKE_INSTALL_PREFIX=/app/radix-engine-toolkit/target/release/build/wabt-sys-58bf03d2f6c1321d/out" "-DCMAKE_C_FLAGS= -ffunction-sections -fdata-sections -fPIC" "-DCMAKE_C_COMPILER=/usr/bin/cc" "-DCMAKE_CXX_FLAGS= -ffunction-sections -fdata-sections -fPIC" "-DCMAKE_CXX_COMPILER=/usr/bin/c++" "-DCMAKE_ASM_FLAGS= -ffunction-sections -fdata-sections -fPIC" "-DCMAKE_ASM_COMPILER=/usr/bin/cc" "-DCMAKE_BUILD_TYPE=Release"
+128.7
+128.7   --- stderr
+128.7   thread 'main' panicked at /root/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cmake-0.1.54/src/lib.rs:1119:5:
+128.7
+128.7   failed to execute command: No such file or directory (os error 2)
+128.7   is `cmake` not installed?
+128.7
+128.7   build script failed, must exit now
+128.7   note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+128.7 warning: build failed, waiting for other jobs to finish...
+```
+
+```
+docker run \
+  -it \
+  -v $(pwd):/mnt \
+  --rm \
+  --name ttt \
+  golang:1.22.11
+
+apt update && apt upgrade -y
+
+apt install -y --no-install-recommends \
+  curl \
+  git \
+  jq \
+  make \
+  protobuf-compiler \
+  xz-utils \
+  sudo \
+  python3-pip \
+  musl-tools \
+  linux-headers-generic \
+  build-essential
+
+apt clean && rm -rf /var/cache/apt/lists
+
+cp -r /mnt /app
+cd /app
+
+rm -rf lib
+
+wget https://github.com/radixdlt/radix-engine-toolkit-go/releases/download/v2.1.1/libradix_engine_toolkit_uniffi_aarch64_unknown_linux_gnu.tar.gz
+tar -xvf libradix_engine_toolkit*.tar.gz
+mv radix-engine-toolkit-* ./lib
+rm libradix*.tar.gz
+
+go install mvdan.cc/gofumpt@v0.5.0
+
+# mkdir -p /usr/include/${ARCH}-linux-musl/
+
+ARCH=$(uname -m)
+ln -s /usr/include/linux /usr/include/${ARCH}-linux-musl/
+ln -s /usr/include/asm-generic /usr/include/${ARCH}-linux-musl/
+ln -s /usr/include/${ARCH}-linux-gnu/asm /usr/include/${ARCH}-linux-musl/
+
+CC=musl-gcc \
+CGO_LDFLAGS="-L$(pwd)/lib -lradix_engine_toolkit_uniffi" \
+CGO_CFLAGS="-D_LARGEFILE64_SOURCE" \
+CGO_ENABLED=1 \
+LD_LIBRARY_PATH="$(pwd)/lib" \
+go install -ldflags "\
+  -X gitlab.com/mayachain/mayanode/constants.Version=$VERSION \
+  -X gitlab.com/mayachain/mayanode/constants.GitCommit=$COMMIT \
+  -X gitlab.com/mayachain/mayanode/constants.BuildTime=$NOW \
+  -X github.com/cosmos/cosmos-sdk/version.Name=MAYAChain \
+  -X github.com/cosmos/cosmos-sdk/version.AppName=mayanode \
+  -X github.com/cosmos/cosmos-sdk/version.Version=$VERSION \
+  -X github.com/cosmos/cosmos-sdk/version.Commit=$COMMIT \
+  -X github.com/cosmos/cosmos-sdk/version.BuildTags=$TAG \
+" ./cmd/mayanode ./cmd/bifrost ./tools/generate
+```
+
+```
+docker build -t registry.gitlab.com/mayachain/mayanode:mocknet -f - . <<'EOF'
+FROM golang:1.22.11 AS build
+
+RUN apt update && \
+  apt upgrade -y && \
+  apt install -y --no-install-recommends \
+    curl \
+    git \
+    jq \
+    make \
+    protobuf-compiler \
+    xz-utils \
+    sudo \
+    python3-pip \
+    musl-tools \
+    linux-headers-generic \
+    build-essential && \
+  apt clean && \
+  rm -rf /var/cache/apt/lists
+
+WORKDIR /app
+
+COPY . .
+
+RUN rm -rf lib
+
+RUN ARCH=$(uname -m) && \
+  wget "https://github.com/radixdlt/radix-engine-toolkit-go/releases/download/v2.1.1/libradix_engine_toolkit_uniffi_${ARCH}_unknown_linux_gnu.tar.gz" && \
+  tar -xvf libradix_engine_toolkit*.tar.gz && \
+  mv radix-engine-toolkit-* ./lib && \
+  rm libradix*.tar.gz
+
+RUN go install mvdan.cc/gofumpt@v0.5.0
+
+RUN export ARCH=$(uname -m) && \
+  mkdir -p /usr/include/${ARCH}-linux-musl/ && \
+  ln -s /usr/include/linux /usr/include/${ARCH}-linux-musl/ && \
+  ln -s /usr/include/asm-generic /usr/include/${ARCH}-linux-musl/ && \
+  ln -s /usr/include/${ARCH}-linux-gnu/asm /usr/include/${ARCH}-linux-musl/
+
+RUN NOW=$(date +'%Y-%m-%d_%T') \
+  VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "dev") \
+  COMMIT=$(git log -1 --format='%H') \
+  TAG=mocknet \
+  NET=mocknet \
+  CC=musl-gcc \
+  CGO_LDFLAGS="-L$(pwd)/lib -lradix_engine_toolkit_uniffi" \
+  CGO_CFLAGS="-D_LARGEFILE64_SOURCE" \
+  CGO_ENABLED=1 \
+  LD_LIBRARY_PATH="$(pwd)/lib" \
+  go install -ldflags "\
+    -X gitlab.com/mayachain/mayanode/constants.Version=$VERSION \
+    -X gitlab.com/mayachain/mayanode/constants.GitCommit=$COMMIT \
+    -X gitlab.com/mayachain/mayanode/constants.BuildTime=$NOW \
+    -X github.com/cosmos/cosmos-sdk/version.Name=MAYAChain \
+    -X github.com/cosmos/cosmos-sdk/version.AppName=mayanode \
+    -X github.com/cosmos/cosmos-sdk/version.Version=$VERSION \
+    -X github.com/cosmos/cosmos-sdk/version.Commit=$COMMIT \
+    -X github.com/cosmos/cosmos-sdk/version.BuildTags=$TAG \
+  " ./cmd/mayanode ./cmd/bifrost ./tools/generate
+
+FROM alpine:3
+
+RUN apk add --no-cache \
+  bind-tools \
+  curl \
+  gcc \
+  jq \
+  libffi-dev  \
+  musl-dev \
+  openssl-dev \
+  protoc \
+  py3-pip \
+  python3-dev \
+  build-base \
+  gcompat
+
+RUN pip3 install --no-cache-dir \
+  requests==2.32.3 \
+  urllib3==2.2.2 \
+  web3==6.20.1 \
+  radix-engine-toolkit==2.1.1
+
+COPY --from=build /go/bin/generate /go/bin/mayanode /go/bin/bifrost /usr/bin/
+COPY build/scripts /scripts
+
+RUN ARCH=$(uname -m) && \
+  wget "https://github.com/radixdlt/radix-engine-toolkit-go/releases/download/v2.1.1/libradix_engine_toolkit_uniffi_${ARCH}_unknown_linux_gnu.tar.gz" && \
+  tar -xvf libradix_engine_toolkit*.tar.gz && \
+  mv radix-engine-toolkit-*/* /lib/ && \
+  rm libradix*.tar.gz
+
+RUN pip3 uninstall -y requests radix-engine-toolkit web3 urllib3
+RUN pip3 install --no-cache-dir requests==2.32.3 urllib3==2.2.2 web3==6.20.1 radix-engine-toolkit==2.1.1
+
+ENV TAG=mocknet
+ENV NET=$TAG
+
+CMD ["/scripts/fullnode.sh"]
+
+EOF
+```
+
+```
+Error response from daemon: conflict: unable to delete 3c03fd23d2c1 (cannot be forced) - image has dependent child images
+Error response from daemon: conflict: unable to delete 9e75f439b5a5 (cannot be forced) - image has dependent child images
+
+docker ps -a --filter ancestor=3c03fd23d2c1
+docker ps -a --filter ancestor=9e75f439b5a5
+
+docker image inspect --format='{{.Id}} {{.Parent}}' $(docker images -q) | grep '3c03fd23d2c1\|9e75f439b5a5'
+
+sha256:3c03fd23d2c1a143cdecb2f0a395255ae643d9dd951829ca35f0d10963b62383
+sha256:9e75f439b5a50519f4e8e48486cf828fcf789f5f1409cb87e88d89cd3a09a97e
+sha256:9e75f439b5a50519f4e8e48486cf828fcf789f5f1409cb87e88d89cd3a09a97e
+
+docker rmi 3c03fd23d2c1a143cdecb2f0a395255ae643d9dd951829ca35f0d10963b62383 9e75f439b5a50519f4e8e48486cf828fcf789f5f1409cb87e88d89cd3a09a97e
+```
+
+I have 2 dependent docker images in a circular dependency which I can't seem
+to get rid of. I really don't want to go hard on the pruning / resetting atm.
+
+Just for completeness, just running the docker-compose file gives me:
+
+> 0.187 go: go.mod requires go >= 1.22.11 (running go 1.22.1; GOTOOLCHAIN=local)
+
+Updating the dockerfile.builder and running `cd ./ci && make builder` gives me:
+
+> 0.125 ln: failed to create symbolic link '/usr/include/x86_64-linux-musl/': No such file or directory
+
+Updating to cpu arch agnostic with this lets it build at least.
+
+```
+RUN ARCH=$(uname -m) && \
+  mkdir -p /usr/include/${ARCH}-linux-musl/ && \
+  ln -s /usr/include/linux /usr/include/${ARCH}-linux-musl/ && \
+  ln -s /usr/include/asm-generic /usr/include/${ARCH}-linux-musl/ && \
+  if [ -d "/usr/include/${ARCH}-linux-gnu/asm" ]; then \
+      ln -s /usr/include/${ARCH}-linux-gnu/asm /usr/include/${ARCH}-linux-musl/; \
+  elif [ -d "/usr/include/asm" ]; then \
+      ln -s /usr/include/asm /usr/include/${ARCH}-linux-musl/; \
+  else \
+      ln -s /usr/include/asm-generic /usr/include/${ARCH}-linux-musl/asm; \
+  fi
+```
+
+Then we get:
+
+```
+ => => # /usr/bin/ld: skipping incompatible /app/lib/libradix_engine_toolkit_uniffi.so when searching for -lradix_engine_toolkit_uniffi
+ => => # /usr/bin/ld: cannot find -lradix_engine_toolkit_uniffi: No such file or directory
+ => => # collect2: error: ld returned 1 exit status
+```
+
+It wont work for me on osx due to the dynamic library having an amd as
+opposed to arm build target.
+
+This brings us back to the docker build script above, which is now cpu architecture
+agnostic. I'll put it under `_scripts/build-docker.sh` for now.
+
+> {"level":"error","network":"mayachain-mainnet-v1","expected":"mayachain","time":"06:44:39","message":"node is not on the same network"}
+
+Right.
+
+```
+{"level":"info","time":"06:44:39","message":"seeds not provided, initializing automatically..."}
+{"level":"error","error":"Get \"http://64.176.67.234:27147/status\": dial tcp 64.176.67.234:27147: connect: connection refused","time":"06:44:39","message":"failed to get node status"}
+{"level":"error","network":"mayachain-mainnet-v1","expected":"mayachain","time":"06:44:39","message":"node is not on the same network"}
+```
+
+Seems to be dialing a load of nodes even though it has `NET=mocknet`??
+
+```bash
+while :; do
+docker run \
+  -it \
+  --rm \
+  --name mayanode1 \
+  --hostname mayanode \
+  -e NET=mocknet \
+  -e CHAIN_ID=mayachain \
+  -e SIGNER_NAME=mayachain \
+  -e SIGNER_PASSWD=1passw0rd1 \
+  -e NODES=1 \
+  -e SEED=mayanode \
+  -e THOR_BLOCK_TIME=5s \
+  -e THOR_API_LIMIT_COUNT=100 \
+  -e THOR_API_LIMIT_DURATION=1s \
+  -e THORNODE_API_ENABLE="true" \
+  -e CHAIN_API=mayanode:1317 \
+  -e CHAIN_RPC=mayanode:26657 \
+  -e BINANCE_HOST=http://binance:26660 \
+  -e BTC_HOST=bitcoin:18443 \
+  -e BTC_DISABLED=true \
+  -e ETH_HOST=http://ethereum:8545 \
+  -e ETH_DISABLED=true \
+  -e ARB_HOST=http://arbitrum:8547 \
+  -e ARB_DISABLED=true \
+  -e XRD_HOST=http://radix:3333/core \
+  -e XRD_DISABLED=true \
+  -e THOR_HOST=http://thorchain:26657 \
+  -e THOR_GRPC_HOST=thorchain:9090 \
+  -e THOR_GRPC_TLS=false \
+  -e THOR_DISABLED=true \
+  -e AVAX_HOST=http://avalanche:9650/ext/bc/C/rpc \
+  -e AVAX_DISABLED=true \
+  -e KUJI_HOST=http://kuji:26657 \
+  -e KUJI_DISABLED=true \
+  -e ADA_HOST=http://cardano:3032 \
+  -e EXTERNAL_IP=127.0.0.1 \
+  -v $(pwd)/build/scripts:/docker/scripts \
+  -v $(pwd)/docker/mocknet/radix:/docker/mocknet/radix \
+  --entrypoint /docker/scripts/genesis.sh \
+  registry.gitlab.com/mayachain/mayanode:mocknet \
+    mayanode start
+
+echo "press any key to restart..."
+read input
+done
+```
+
+The `hostname` has to be `mayanode` for the genesis script.
+
+It crashes on `Deploying ETH contracts` and then I think because of
+`restart: unless-stopped` it comes back and somehow decides it's on the main
+network now?
+
+Had to add sh conditions to skip waiting / contract deployment on ETH, ARB and
+XRD when they are disabled.
+
+`NET=mocknet` isn't exported? Wait it is, why is it checking for `maya`?
+
+> Error: error validating genesis file /root/.mayanode/config/genesis.json: invalid Bech32 prefix; expected maya, got tmaya
+
+> Error: error validating genesis file /root/.mayanode/config/genesis.json: duplicate account found in genesis state; address:
+
+Actually it alternates between those above errors.
+
+The first address is not tmaya??  
+`maya1lkyem8f6pajdcgd2x4jtj4pnwkfxa2ngawh9jr` 
+
+```
+rm /root/.mayanode/config/genesis.json
+mayanode init local --chain-id "$CHAIN_ID" 2>&1 | jq
+```
+
+We're fine at that point.
+
+```
+echo "$SIGNER_PASSWD" | mayanode keys list --keyring-backend file
+```
+
+Ah it's already bad at this point.
+
+Bit of a frustrating day, just wrestling with builds, images and the mocket
+startup. Better luck tomorrow eh...
 
 
+#### 26.02.2025 Wednesday 6h
+
+Right, we were getting maya not tmaya, completely ignoring the NET env variable.  
+
+Funny how you can sleep on a problem and immediately see a solution coming back
+to it the next day. The go binary is built with mocknet/mainnet target via the
+`-tags` build argument. The `NET` env variable is more to do with the makefile
+scripts I think. Must have missed that flag somewhere.
+
+Moved the radix library download before the `COPY . .` docker for build speed.
+
+Think I've mentioned this before, but it's better for maya/bifrost to share
+the same env vars. Maya genesis scripts need to know about `<chain>_DISABLED`
+values.
+
+```
+ERR go/pkg/mod/github.com/tendermint/tendermint@v0.34.21/consensus/state.go:727 > CONSENSUS FAILURE!!! err="runtime error: invalid memory address or nil pointer dereference" module=consensus stack="goroutine 137 [running]:
+runtime/debug.Stack()
+  /usr/local/go/src/runtime/debug/stack.go:24 +0x64
+github.com/tendermint/tendermint/consensus.(*State).receiveRoutine.func2()
+  /go/pkg/mod/github.com/tendermint/tendermint@v0.34.21/consensus/state.go:727 +0x44
+panic({0x1f9aaa0?, 0x3ee48c0?})
+  /usr/local/go/src/runtime/panic.go:770 +0x124
+gitlab.com/mayachain/mayanode/x/mayachain.AppModule.BeginBlock({{}, _, {{_, _}, {_, _}, {_, _}}, _}, {{0x2d983a8, ...}, ...}, ...)
+  /app/x/mayachain/module.go:206 +0xa84
+github.com/cosmos/cosmos-sdk/types/module.(*Manager).BeginBlock(_, {{0x2d983a8, 0x41110c0}, {0x2dac480, 0x40000b1b40}, {{0xb, 0x0}, {0x4001107110, 0x9}, 0x1, ...}, ...}, ...)
+  /go/pkg/mod/github.com/cosmos/cosmos-sdk@v0.45.9/types/module/module.go:491 +0x154
+gitlab.com/mayachain/mayanode/app.(*BASEChainApp).BeginBlocker(...)
+  /app/app/app_default.go:13
+github.com/cosmos/cosmos-sdk/baseapp.(*BaseApp).BeginBlock(_, {{0x40007c4ea0, 0x20, 0x20}, {{0xb, 0x0}, {0x4001107110, 0x9}, 0x1, {0x325a5363, ...}, ...}, ...})
+  /go/pkg/mod/github.com/cosmos/cosmos-sdk@v0.45.9/baseapp/abci.go:177 +0x76c
+github.com/tendermint/tendermint/abci/client.(*localClient).BeginBlockSync(_, {{0x40007c4ea0, 0x20, 0x20}, {{0xb, 0x0}, {0x4001107110, 0x9}, 0x1, {0x325a5363, ...}, ...}, ...})
+  /go/pkg/mod/github.com/tendermint/tendermint@v0.34.21/abci/client/local_client.go:280 +0x104
+github.com/tendermint/tendermint/proxy.(*appConnConsensus).BeginBlockSync(_, {{0x40007c4ea0, 0x20, 0x20}, {{0xb, 0x0}, {0x4001107110, 0x9}, 0x1, {0x325a5363, ...}, ...}, ...})
+  /go/pkg/mod/github.com/tendermint/tendermint@v0.34.21/proxy/app_conn.go:81 +0x4c
+github.com/tendermint/tendermint/state.execBlockOnProxyApp({0x2d984f8, 0x4000684840}, {0x2da34b0, 0x40006dd440}, 0x40011723c0, {0x2daad98, 0x4000899560}, 0x1)
+  /go/pkg/mod/github.com/tendermint/tendermint@v0.34.21/state/execution.go:307 +0x378
+github.com/tendermint/tendermint/state.(*BlockExecutor).ApplyBlock(_, {{{0xb, 0x0}, {0x40008815a0, 0x7}}, {0x40008815a7, 0x9}, 0x1, 0x0, {{0x0, ...}, ...}, ...}, ...)
+  /go/pkg/mod/github.com/tendermint/tendermint@v0.34.21/state/execution.go:140 +0x128
+github.com/tendermint/tendermint/consensus.(*State).finalizeCommit(0x40005fe388, 0x1)
+  /go/pkg/mod/github.com/tendermint/tendermint@v0.34.21/consensus/state.go:1659 +0x8ec
+github.com/tendermint/tendermint/consensus.(*State).tryFinalizeCommit(0x40005fe388, 0x1)
+  /go/pkg/mod/github.com/tendermint/tendermint@v0.34.21/consensus/state.go:1568 +0x26c
+github.com/tendermint/tendermint/consensus.(*State).enterCommit.func1()
+  /go/pkg/mod/github.com/tendermint/tendermint@v0.34.21/consensus/state.go:1503 +0x7c
+github.com/tendermint/tendermint/consensus.(*State).enterCommit(0x40005fe388, 0x1, 0x0)
+  /go/pkg/mod/github.com/tendermint/tendermint@v0.34.21/consensus/state.go:1541 +0xac4
+github.com/tendermint/tendermint/consensus.(*State).addVote(0x40005fe388, 0x400015d9a0, {0x0, 0x0})
+  /go/pkg/mod/github.com/tendermint/tendermint@v0.34.21/consensus/state.go:2155 +0x13c8
+github.com/tendermint/tendermint/consensus.(*State).tryAddVote(0x40005fe388, 0x400015d9a0, {0x0?, 0x4e50a0?})
+  /go/pkg/mod/github.com/tendermint/tendermint@v0.34.21/consensus/state.go:1953 +0x28
+github.com/tendermint/tendermint/consensus.(*State).handleMsg(0x40005fe388, {{0x2d7e1e0, 0x400008acd0}, {0x0, 0x0}})
+  /go/pkg/mod/github.com/tendermint/tendermint@v0.34.21/consensus/state.go:856 +0x110
+github.com/tendermint/tendermint/consensus.(*State).receiveRoutine(0x40005fe388, 0x0)
+  /go/pkg/mod/github.com/tendermint/tendermint@v0.34.21/consensus/state.go:783 +0x370
+created by github.com/tendermint/tendermint/consensus.(*State).OnStart in goroutine 1
+  /go/pkg/mod/github.com/tendermint/tendermint@v0.34.21/consensus/state.go:379 +0xf0
+```
+
+Good lord.
+
+```
+mayanode query mayachain version --output json
+```
+
+> {"version":"0.0.0","git_commit":"","build_time":""}
+
+Unlikely.
+
+```
+VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "dev")
+echo "-X gitlab.com/mayachain/mayanode/constants.Version=$VERSION"
+```
+
+Fine.
+
+```
+docker run --rm registry.gitlab.com/mayachain/mayanode:mocknet mayanode query mayachain version --output json
+```
+
+> By default, the .git directory is typically excluded from the Docker build
+  context due to .dockerignore files or Docker's default behavior
+
+Oh that's what's doing it. Alright with docker `build-args` and `ARG`...
+
+```
+{"version":"0.0.0","git_commit":"6c18eb6176adc6011247bb183f8292d72da74d64","build_time":"2025-02-26_11:21:06"}
+```
+
+Almost. What's up with the version? Can't parse the leading `v`?  
+Yep that was it.  
+Oh we do `cat version`, it's in a file not taken from the git tag.
+
+```
+{"version":"1.114.0","git_commit":"6c18eb6176adc6011247bb183f8292d72da74d64","build_time":"2025-02-26_11:25:05"}
+```
+
+- delete @PubKey @KVStore logs
+- add _DISABLED to bifrost conf for other chains
+
+Not sure if this is something to worry about:
+
+> app/x/mayachain/manager_network_current.go:1213 > error calculating rewards totalBonded=0 totalProvidedLiquidity=50000000005
+
+```
+dash-cli signrawtransactionwithwallet 0200000001562cb7c72e10045d97a85c284425af67a852ce3413b7aa4c81bf7319e775b30a0100000000ffffffff0300e40b54020000001976a91410a5d7bbfecafedc571d08ec9939beadb470018988acc0c15bf4140000001976a9147642779266a6eb356af5e324520fecfe1e0d4a5888ac00000000000000003c6a3a6164643a646173682e646173683a746d617961317765703830796e78356d346e3236683475766a3979726c766c633071366a6a63736d6475647500000000
+```
+
+```
+{
+  "hex": "0200000001562cb7c72e10045d97a85c284425af67a852ce3413b7aa4c81bf7319e775b30a0100000000ffffffff0300e40b54020000001976a91410a5d7bbfecafedc571d08ec9939beadb470018988acc0c15bf4140000001976a9147642779266a6eb356af5e324520fecfe1e0d4a5888ac00000000000000003c6a3a6164643a646173682e646173683a746d617961317765703830796e78356d346e3236683475766a3979726c766c633071366a6a63736d6475647500000000",
+  "complete": false,
+  "errors": [
+    {
+      "txid": "0ab375e71973bf814caab71334ce52a867af2544285ca8975d04102ec7b72c56",
+      "vout": 1,
+      "scriptSig": "",
+      "sequence": 4294967295,
+      "error": "Input not found or already spent"
+    }
+  ]
+}
+```
+
+```
+dash-cli getaddressbalance "{\"addresses\": [\"yd87oNiYjT9fx6esjSeWZWuvRHwWhqnu3h\"]}"
+```
+
+```
+app/bifrost/blockscanner/blockscanner.go:107 > fail to get current block scan pos, ADA will start from 14 error="leveldb: not found" chain=ADA module=blockscanner service=bifrost
+panic: runtime error: invalid memory address or nil pointer dereference
+[signal SIGSEGV: segmentation violation code=0x1 addr=0x0 pc=0x4a7d78]
+
+goroutine 1 [running]:
+sync.(*WaitGroup).Add(0x40006c9c20?, 0x40007cb0f8?)
+  /usr/local/go/src/sync/waitgroup.go:52 +0x18
+gitlab.com/mayachain/mayanode/bifrost/pkg/chainclients/cardano.(*Client).Start(0x400052f508, 0x40027ae060, 0x40044dd2a8?, 0x40007d5b20?)
+  /app/bifrost/pkg/chainclients/cardano/client.go:577 +0x80
+gitlab.com/mayachain/mayanode/bifrost/observer.(*Observer).Start(0x400108b860)
+  /app/bifrost/observer/observe.go:119 +0x80
+main.main()
+  /app/cmd/bifrost/main.go:211 +0x1010
+Waiting for MAYAChain...
+MAYAChain ready
+```
+
+```
+panic: runtime error: integer divide by zero
+
+goroutine 173 [running]:
+gitlab.com/mayachain/mayanode/bifrost/blockscanner.(*BlockScanner).scanBlocks(0x4002dd01e0)
+  /app/bifrost/blockscanner/blockscanner.go:244 +0x930
+created by gitlab.com/mayachain/mayanode/bifrost/blockscanner.(*BlockScanner).Start in goroutine 1
+  /app/bifrost/blockscanner/blockscanner.go:112 +0x154
+```
+
+NOTE: In ApproximateBlockMilliseconds, if we return 0 by default it can cause
+the above integer divide by zero panic. Let's return 10s/10_000ms by default.
+
+```
+2:55AM ERR app/bifrost/pkg/chainclients/cardano/client.go:716 > fail to get utxos to spend error="fail to get UTXOs: fail to get ADA Address for pubkey(tmayapub1addwnpepqgzwj0et7lca9889htv0q2tw53saf98fa56xv4xdsvszeeqty34pwgz85cg): invalid pubkey for deriving cardano address. expected *ed25519.PubKey, got *secp256k1.PubKey" module=cardano service=bifrost
+```
+
+Bifrost was failing because `consolidateUTXOs` was passing the `vault.PubKey`
+for all chains, where it should be the appropriate key for the chain.
+
+There are a few pubkey areas in the client I'm unsure about.
+- we set `c.nodePubKey`, no eddsa
+- we use `asgard.PubKey` in `ReportSolvency`, same concern
+
+Continue tomorrow from local/debug binaries with dash1 cardano1 from mocknet...
+
+#### 27.02.2025 Thursday 6h
+
+`demotest-local`
+
+Slightly different from the demotest original, we have to target my osx binary
+rather than the binary running within the maya/bifrost container.
+
+Maybe I can just alias / do a bash func for `mayanode` so I can reuse?
+
+For quick iteration here I'd like to have it runnable on the cli as well as ide
+and docker.
+
+These scripts register mayanode and bifrost cmds regardless of binary location:
+
+```
+./_scripts/mocknet/genesis.sh
+
+. ./_scripts/cmd-local.sh
+. ./_scripts/cmd-docker.sh
+
+mayanode start
+bifrost
+```
+
+Seemingly not getting ADA network fee updates?
+
+```
+mayanode keys list --keyring-backend file
+```
+
+```
+mayaAddress1=$(echo "$SIGNER_PASSWD" | mayanode keys list --keyring-backend file --output json | jq -r '.[] | select(.name=="demo") | .address')
+
+- name: demo
+  type: local
+  address: tmaya1wep80ynx5m4n26h4uvj9yrlvlc0q6jjcsmdudu
+  pubkey: '{"@type":"/cosmos.crypto.secp256k1.PubKey","key":"AlLg8JIEJknrhDRjAfM06KoB/56vLl3yNaCnS14+LXuv"}'
+  mnemonic: ""
+- name: mayachain
+  type: local
+  address: tmaya15ynfp23mu07cdwa6d0dhy3ul40wlyxhp4f6qx5
+  pubkey: '{"@type":"/cosmos.crypto.secp256k1.PubKey","key":"AzTrTXcpRRZ6lQPjsMFv0fe+D3tFe7Uenlv16jv9Ydq8"}'
+  mnemonic: ""
+
+mayanode tx mayachain deposit 100000000000 CACAO "NOOP" \
+  --from demo \
+  --keyring-backend file \
+  --chain-id mayachain \
+  --gas 1000000 \
+  --yes
+
+Error: rpc error: code = NotFound desc = rpc error: code = NotFound desc = account tmaya1wep80ynx5m4n26h4uvj9yrlvlc0q6jjcsmdudu not found: key not found
+
+mayanode tx mayachain deposit 100000000000 CACAO "NOOP" \
+  --from mayachain \
+  --keyring-backend file \
+  --chain-id mayachain \
+  --gas 1000000 \
+  --yes
+
+insufficient funds
+
+mayanode tx mayachain send $mayaAddress1 10000000000cacao \
+  --from mayachain \
+  --keyring-backend file \
+  --chain-id mayachain \
+  --yes
+
+mayanode --chain-id mayachain query account tmaya1wep80ynx5m4n26h4uvj9yrlvlc0q6jjcsmdudu
+
+not found
+
+mayanode --chain-id mayachain query account tmaya15ynfp23mu07cdwa6d0dhy3ul40wlyxhp4f6qx5
+
+'@type': /cosmos.auth.v1beta1.BaseAccount
+account_number: "0"
+address: tmaya15ynfp23mu07cdwa6d0dhy3ul40wlyxhp4f6qx5
+pub_key:
+  '@type': /cosmos.crypto.secp256k1.PubKey
+  key: AzTrTXcpRRZ6lQPjsMFv0fe+D3tFe7Uenlv16jv9Ydq8
+sequence: "157"
+
+mayanode query bank balances tmaya15ynfp23mu07cdwa6d0dhy3ul40wlyxhp4f6qx5
+mayanode query bank balances tmaya1wep80ynx5m4n26h4uvj9yrlvlc0q6jjcsmdudu
+```
+
+> account sequence mismatch, expected 10, got 8: incorrect account sequence
+
+> account sequence mismatch, expected 38, got 36
 
 
+ 100000000000
+  10000000000cacao
+
+> {"level":"error","service":"bifrost","module":"bifrost","error":"fail to
+  create block scanner: -32603: Unable to find any
+  ChainLock","chain":"DASH","time":"16:52:31","caller":"/Users/adc/s/mayanode/bifrost/pkg/chainclients/loadchains.go:90","message":"failed
+  to load chain"}
+
+> 4:58PM ERR x/mayachain/handler.go:242 > fail to parse memo error="MEMO: add:dash.dash:tmaya1wep80ynx5m4n26h4uvj9yrlvlc0q6jjcsmdudu\n\nPARSE FAILURE(S): cannot parse 'tmaya1wep80ynx5m4n26h4uvj9yrlvlc0q6jjcsmdudu\n' as an Address: tmaya1wep80ynx5m4n26h4uvj9yrlvlc0q6jjcsmdudu\n is not recognizable"
+> 4:58PM ERR x/mayachain/handler_observed_txin.go:270 > fail to process inbound tx error="MEMO: add:dash.dash:tmaya1wep80ynx5m4n26h4uvj9yrlvlc0q6jjcsmdudu\n\nPARSE FAILURE(S): cannot parse 'tmaya1wep80ynx5m4n26h4uvj9yrlvlc0q6jjcsmdudu\n' as an Address: tmaya1wep80ynx5m4n26h4uvj9yrlvlc0q6jjcsmdudu\n is not recognizable" tx hash=AF28D48627E50CC387BE6168F64D24EA86A52F3555F339DE4EBD90BCC0D6D586
+
+Newline char? Yeah I was using echo without the `-n` flag and piping to
+`hexdump` to convert the memo to hex.
+
+`curl http://localhost:1317/mayachain/pools`  
+`[]`  
+
+Pools are not returned if:
+- LP units = 0
+- asset is synth
+
+> {"level":"error","service":"bifrost","module":"blockscanner","chain":"ADA","error":"unknown
+  transaction output type: rpcclient.TxOutput","block
+  height":96,"time":"17:32:14","caller":"/Users/adc/s/mayanode/bifrost/blockscanner/blockscanner.go:234","message":"fail
+  to get RPCBlock"}
+
+Ah I'm still using the old rpc struct types somewhere in the bifrost client.
+
+Say you have this tx:  
+`421f92c9caf4556b9a60e9b2458d475257b99329052c12a494d84ea0f6fcb015`  
+and you want to know the sender.  
+We assume it's the first address from the inputs.  
+So we fetch the tx corresponding to: `.inputs[0].hash`  
+`98e6def6bda6d5d8dbe6ecd50f4c5a655e0a22d4305eb9037e2a57fc9c5deb29`
+The `.outputs[0].address` is the sender.
+
+```
+[
+    {
+        "balance_cacao": "1000000000",
+        "balance_asset": "10000000000",
+        "asset": "DASH.DASH",
+        "LP_units": "1000000000",
+        "pool_units": "1000000000",
+        "status": "Available",
+        "synth_units": "0",
+        "synth_supply": "0",
+        "pending_inbound_cacao": "0",
+        "pending_inbound_asset": "0",
+        "savers_depth": "0",
+        "savers_units": "0",
+        "synth_mint_paused": false,
+        "bondable": true
+    }
+]
+```
+
+dash pool showing up. where's ada?
+
+We're not getting the `handleMsgObservedTxIn` for ADA so the add tx isn't being
+attributed.
+
+tx `3ca3bfc8be6327fbb59e4a577014526b074c51ba9f9564b15f5a7f9af79303a2`  
+block `5867ad1def6a81dbe3eaf961457db0e578651a40243525ee0c788a20d2a42ece`  
+the output1 address is the inbound address `addr_test1vq3xvg2unche6ljfqjqwkyvsesfg0rd354cln5edkdafspsz0re4v`  
+
+`http://localhost:1317/mayachain/lastblock` for `ADA` is:
+
+```
+{
+  "chain": "ADA",
+  "last_observed_in": 0,
+  "last_signed_out": 0,
+  "mayachain": 130
+}
+```
+
+tx 5605a9a628d86c6bef49924cf6e6613c56443dd1d6fb00231b6062078690e53d
+block ebaa7c63fc01e25790dbb2c779fe256e207be7f9bf9fdfe80555c3599817e2e5 114
+
+```
+6:23PM DBG bifrost/blockscanner/blockscanner.go:226 > chain height 114 is less than current block 115 chain=ADA module=blockscanner service=bifrost
+```
+
+bifrost is seeing these txs, but dismissing them for some reason?  
+no it's not it's actually adding them to the txout array and sending to maya.  
+that's it for me today, check out maya tomorrow...
+
+#### 28.02.2025 Friday 6h
+
+The `BlockScanner` receives the `globalTxsQueue` as an argument to the `Start`
+interface method passed by reference `chan types.TxIn`, which it assigns to
+a field by the same name on the receiver.
+
+The bifrost `Client` struct embeds a `BlockScanner` instance and implements its
+own `Start` where it delegates logic regarding that queue to the `BlockScanner`.
+
+Moving futher up to locate the origin of this queue and work out how it works,
+we see a familiar pattern, a `Start` method on a `Observer` instance iterating
+through all the chains and calling `Start` on each one.
+
+There is a single observer, instantiated within the bifrost `main()` entrypoint.
+The queue in question is created along with the `Observer` in the
+`NewObserver...` func.
+
+`Observer.processTxIns` - still within bifrost - receives from that queue.
+There's some filtering logic before `Oberserver.onDeck []types.TxIn` is set.
+
+These are eventually `chunkifyAndSendToThorchain`'ed - this method still hasn't
+been renamed to mayachain.
+
+So my last check is here, to see if this cardano pool tx hash gets to this point...
+
+It does, but it's being filtered out at `Observer.filterObservations`.
+
+The `PubKeyManager` only has 1 public key when `matchAddress` is called for ADA.  
+Let me guess, it's not an ed25519 key?  
+Yep.  
+
+> fail to get address for chain ADA,invalid pubkey for deriving cardano address. expected *ed25519.PubKey, got *secp256k1.PubKey  
 
 
+Investigating that `PubKeyManager`...  
+
+Ahh the pubkey for ADA is quite obviously wrong, as it's the same as all the
+secp responses in the `/inbound_addresses` response despite the address being
+correctly set.
+
+It's specifically `/mayachain/vaults/pubkeys` though which comes first.
+
+Need to come back to `PubKeyManager.fetchPubKeys` when that's fixed.
+
+`vault.PubKey` causing issues again!
+
+If I had ultimate say here, I'd replace pub_key and pub_key_eddsa on `message Vault`
+with an array of common.PubKey `repeated string pubkeys` because it's too easy
+for a dev to select vault.PubKey instead or vault.PubKeyEddsa or vault.PubKeyFutureKind.
+
+Unfortunately that would introduce BC breaks and I'm not sure exactly where, so
+I'm stuck with making this work. I'd rather hide those fields completely but we
+can't un-export/hide go struct fields when using protobuf, so the next best
+thing is to implement accessor methods and mark all the pubkey fields as
+deprecated.
+
+Refactor away direct access to (in favor of accessor methods):
+- [ ] vault.PubKey
+- [ ] vault.PubKeyEddsa
+
+I'd also refactor any use of the word 'pk' where it can ONLY be a secp key, 
+to secpPublicKey for specificity. Otherwise we need a keyset or something. As
+that's a nice-to-have and not critical like the ones above, I'll move on and
+just note it here.
+
+I have a TODO next to this code as well:
+
+```
+!vault.Contains(c.nodePubKey)
+```
+
+- [ ] KVStore.VaultExists
+
+So nodes can have a pubkeyset now including all varieties of keys right?  
+I think we have to handle that too...  
+
+Update cardano bifrost client for v0.1.8
+
+If SECP starts with "Standards for Efficient Cryptography", what's the P?
+> "sec" stands for "Standards for Efficient Cryptography"
+> "p" indicates that the curve is defined over a prime field (specifically, a finite field of prime order)
+> "256" is the bit length of the prime field
+> "k" refers to the Koblitz curve family
+> "1" indicates it's the first (and only) curve in this specific parameterization
+
+Maybe I can get away with `GetSECPPublicKey`?
+
+This is what the kvstore key looks like for a vault:  
+`vault//TMAYAPUB1ADDWNPEPQDY2XFWJQJWN8TT6ZQJ3H720VZE2H9AK5JAE527RSZDWH24JEED3VVZZ3M2`
+
+`k.GetKey(ctx ...` is a bit misleading because the context is not used at all.
+Makes it seem like it's accessing some other db or something but it's simply
+formatting a string
+
+- always store vaults via their secp key
+- use a X->secp lookup when retrieving
+
+now I thought maybe vault_asgard_index would be a way to lookup a vault
+
+So it turns out my understanding of the way vaults are stored was lacking, and
+there's quite a bit of work to do here. Always the way.
+
+I need to fundamentally change this: `http://localhost:1317/mayachain/vaults/pubkeys`
+
+From this:
+
+```
+{
+  "asgard": [
+    {
+      "pub_key": "tmayapub1addwnpepqdy2xfwjqjwn8tt6zqj3h720vze2h9ak5jae527rszdwh24jeed3vvzz3m2",
+      "routers": null
+    }
+  ],
+  "yggdrasil": [],
+  "inactive": []
+}
+```
+
+To this:
+
+```
+{
+  "asgard": [
+    {
+      "pub_keys": [
+        "tmayapub1addwnpepqdy2xfwjqjwn8tt6zqj3h720vze2h9ak5jae527rszdwh24jeed3vvzz3m2",
+        "tmayapub1zcjduepq3j58z48yveagahyj6vpy2xnamn0yd3jsgac77nwzhnwa50g3a72sgyrd8l"
+      ],
+      "routers": null
+    }
+  ],
+  "yggdrasil": [],
+  "inactive": []
+}
+```
+
+But in order to maintain BC I'll do:
+
+```
+{
+  "asgard": [
+    {
+      "pub_key": "tmayapub1zcjduepq3j58z48yveagahyj6vpy2xnamn0yd3jsgac77nwzhnwa50g3a72sgyrd8l",
+      "pub_key_eddsa": "tmayapub1addwnpepqdy2xfwjqjwn8tt6zqj3h720vze2h9ak5jae527rszdwh24jeed3vvzz3m2",
+      "routers": null
+    }
+  ],
+  "yggdrasil": [],
+  "inactive": []
+}
+```
+
+Instead of GetSECPPubKey... GetEDDSAPubKey  
+We could just have GetPubKey(signingAlgo)  
+
+`GetPubKey(common.SigningAlgoSecp256k1)`
+
+It's better to use secp/edwards rather than ecdsa/eddsa for 2 reasons:
+1. it's easier to visually distinguish
+2. secp256k1 and edwards are both elliptic curve schemes AND digital signature algos
+
+There are over 500 usages of vault.PubKey so this commit is going to be *coughs*
+quite a change.
+
+Smelly comment:  
+> // Deprecated: Bech32PubKeyType defines a string type alias for a Bech32 public key type.
+
+No explanation, no alternative suggestion, no links or references, nothing else
+on the page to help me understand without digging futher. It's under legacy bech
+but the other bech logic doesn't contain the same functionality.
+
+/Users/adc/go/pkg/mod/github.com/cosmos/cosmos-sdk@v0.45.9/crypto/keys/secp256k1
+
+I'm 10mins into overtime. Really wanted to get this working this month but in
+reality the eddsa work was not even close to being done. There were some fields
+to the vault. That's a fraction of what's actually needed to facilitate chains
+with other signing algos.
+
+Happy to continue but I'm going to need a lot of help reviewing this guys...
+
+#### 01.03.2025 Saturday 1h
+
+Maybe can squeeze some refactoring in...
+
+A `TxOutItem` has a VaultPubKey field. If this is eventually used to retrieve 
+a vault, then we just want to use the secp key, otherwise we need to use the
+key for the target chain.
+
+- discoverOutbounds
+    toi.VaultPubKey, err = vault.GetPubKeyForChain(toi.Chain)
+    if err != nil {
+      continue
+    }
+
+- nativeTxOut
+  pubKey, err := active[0].GetPubKeyForChain(tx.Chain)
+  if err != nil {
+    ctx.Logger().Error("fail to get pubkey during native txout", "err", err)
+    return err
+  }
+
+YggdrasilVault doesn't have an eddsa key? Surely that's been overlooked?
+
+I cant work out why we're constantly calling this:  
+`KVStore.setStrings("vault_asgard_index//", []string{})`  
+I've simplified a bit but that's essentially what's happening, we're continually
+setting that key to an empty array of strings. For me it's 8x per block??  
+
+#### 02.02.2025 Sunday 5h
+
+I was totally wrong about that. Bad copypasta on my part.  
+We're actually retrieving that index a lot. Makes way more sense.  
+
+mayanode -> BeginBlock -> addAsgardIndex
+
+vault_asgard_index_redirect_eddsa
+
+deck confirmation required is set to 124? That's quite a lot.
+
+there's a "deck" for each chain
+
+This is confusing:
+```
+deck.ConfirmationRequired = chainClient.GetConfirmationCount(deck)
+```
+
+Because of course the number of confirmations required, and the current number
+of confirmations, are not the same thing. Setting one to the other's a bit of a
+mind fuck. Is it actually asking
+`client.GetConfirmationCountRequiredToConsiderATxSecure` (deliberatly verbose but
+you get my point), or is it setting `deck.Confirmations =
+currentConfirmations` ??
+
+It's the former. So it really should be refactored from GetConfirmationCount to
+GetRequiredConfirmationCount, because it's not returning the confirmation count
+of the transaction, it's returning the number of confirmations we need before
+we acknowledge it?
+
+```
+{
+    "balance_cacao": "500000000",
+    "balance_asset": "20000000",
+    "asset": "ADA.ADA",
+    "LP_units": "1000000000",
+    "pool_units": "1000000000",
+    "status": "Available",
+    "synth_units": "0",
+    "synth_supply": "0",
+    "pending_inbound_cacao": "0",
+    "pending_inbound_asset": "0",
+    "savers_depth": "0",
+    "savers_units": "0",
+    "synth_mint_paused": false,
+    "bondable": false
+  },
+```
+
+not bondable?
+
+> ERR bifrost/pkg/chainclients/dash/client.go:370 > fail to parse memo:
+  swap:ada.ada:addr_test1vp8vuw4n0fr9l4z7kzrs5lryv7t76pv36eca5syc5x435ms3vwgdx
+  error="address format not supported:
+  addr_test1vp8vuw4n0fr9l4z7kzrs5lryv7t76pv36eca5syc5x435ms3vwgdx" module=dash
+  service=bifrost
+
+interesting.  
+`ParseSwapMemoV112`  
+`NewAddressV111` - manages that address no problem.  
+
+Well keeper is nil at the first guard clause within `ParseSwapMemo` so it always
+calls `ParseSwapMemoV1`. Is my version not set correctly??
+
+We need to update the `NewAddressV1` func to support cardano, because apparently
+it actually gets there. Because of that, we also need to update the regex used
+to validate addresses `alphaNumRegex` to also allow underscore `_` characters
+which cardano uses.
+
+> ERR x/mayachain/handler_observed_txin.go:270 > fail to process inbound tx
+  error="swap destination address is not the same chain as the target asset:
+  unknown request" tx
+  hash=95DDF2813E28EE58E959BA8B4E229B0A3B2C2666F87E4834B1CC5B3424BB1580
+
+There are three places where that error can occur, all `ValidateBasic...`  
+
+I'm now seeing pre/post swap for ada->dash with the dash address being logged
+in maya. Nothing in the bifrost? No errors on maya? Where did that tx go?
+
+> INF x/mayachain/handler_add_liquidity.go:289 > try update pool decimals asset=ADA.ADA pool decimals=0
+
+Looks wrong, should be 6 decimals?
+
+> ERR x/mayachain/manager_gas_current.go:99 > network fee is invalid error="transaction size can't be zero or negative: 0" chain=ADA
+
+> ERR x/mayachain/handler_swap.go:39 > fail to handle MsgSwap error="fail to add outbound tx: 2 errors occurred:\n\t* internal error\n\t* fail to prepare outbound tx: insufficient funds for outbound request: addr_test1vpz5j4fjle4mkehuec4rwrq4z58rxthx9f6p97d9lgestpstdpmj4 4688329 remaining\n\n"
+
+> ERR x/mayachain/manager_swap_queue_current.go:122 > fail to swap error="fail to add outbound tx: 2 errors occurred:\n\t* internal error\n\t* fail to prepare outbound tx: insufficient funds for outbound request: addr_test1vpz5j4fjle4mkehuec4rwrq4z58rxthx9f6p97d9lgestpstdpmj4 4688329 remaining\n\n" msg="4C57ED97D6A4FBDFE7BD6DD4BBC52E3B1F3C6F3F88AC0C617484945F46C12807: yX6kD415WGpwwDkb1AEgJettjj775KSSUZ ==> yU2AtUDg5nwJjQPq3kbELboz32wjAWSds6 (Memo: swap:ada.ada:addr_test1vpz5j4fjle4mkehuec4rwrq4z58rxthx9f6p97d9lgestpstdpmj4) 10000000000 DASH.DASH (gas: [1000000 DASH.DASH])"
+
+#### 04.02.2025 Tuesday 5h 40m
+
+Starting with:  
+> insufficient funds for outbound request
+
+`discoverOutbounds` is not finding the ones we need.  
+`SwapperVCUR.Swap`  
+`TxOutStore.TryAddTxOutItem`  
+
+Not passing this check:  
+`vault.GetCoin(toi.Coin.Asset).Amount.LTE(transactionFeeAsset)`  
+
+The vault doesn't have enough balance?
+
+```
+[
+  {
+    "balance_cacao": "500000000",
+    "balance_asset": "20000000",
+    "asset": "ADA.ADA",
+    "LP_units": "1000000000",
+    "pool_units": "1000000000",
+    "status": "Available",
+    "synth_units": "0",
+    "synth_supply": "0",
+    "pending_inbound_cacao": "0",
+    "pending_inbound_asset": "0",
+    "savers_depth": "0",
+    "savers_units": "0",
+    "synth_mint_paused": false,
+    "bondable": false
+  },
+  {
+    "balance_cacao": "1209999706",
+    "balance_asset": "8400001804",
+    "asset": "DASH.DASH",
+    "LP_units": "1000000000",
+    "pool_units": "1000000000",
+    "status": "Available",
+    "synth_units": "0",
+    "synth_supply": "0",
+    "pending_inbound_cacao": "0",
+    "pending_inbound_asset": "0",
+    "savers_depth": "0",
+    "savers_units": "0",
+    "synth_mint_paused": false,
+    "bondable": true
+  }
+]
+```
+
+So the amount is showing in the pool, but not attributed to the vault for some
+reason.  
+Maybe `Vault.AddFunds` is not being called for ada? It is.  
+How can I query the vault before I swap?  
+
+http://localhost:1317/mayachain/vaults/asgard  
+
+There's also:  
+http://localhost:1317/mayachain/vaults/yggdrasil
+
+http://localhost:3032/utxo/
+
+After the ada -> dash swap, we're not seeing the change being reattributed to
+the vault, so it drops to 0 ADA and stays there. That's the main issue.
+
+In `manager_network_current` and `manager_yggdrasil_current`, I've added eddsa
+to the membership arrays. If I do that I get a consensus failure when starting
+mayanode, kinda makes sense that's the node/validator index so we only need
+to specify the secp right? Does that cause issues when we need to work out which
+nodes need to sign a tx?
+
+Okay so now `tx fee asset: 2000000000` why is that so insanely large?  
+2k ada fee? I don't think so.  
+
+For dash we're sending the tx fee `bridge.PostNetworkFee` when:
+- the client is created
+- every time fetch txs is called
+
+I'll make sure to mirror that...
+
+Need to make sure I'm using the fees correctly:
+
+```
+"fees": {
+    "coinsPerUtxoByte": 4310,
+    "maxTxSize": 16384,
+    "minFeeCoefficient": 44,
+    "minFeeConstant": 155381,
+    "minUtxoThreshold": 849070
+}
+```
+
+At the moment I'm calculating the average tx fee for each block and sending that
+as the fee.  
+
+It'd be more accurate if I had tx size estimates for maya like the other clients...  
+
+For dash it's 451 bytes.  
+3 vouts because you can't spend the OP_RETURN memo field in dash so it becomes
+1 deposit, 1 change, 1 memo.  
+There used to be a distinction between inbound/outbound size because the outbound
+txs didn't have a memo field. Now we have additional tracking memos so I believe
+they're the same size.  
+For cardano we have a separate field for change address and memo/aux, so 1 vin
+and 1 vout works.  
+The dash client comments say "assuming 2 vins" which I'm not sure about. Why 2?  
+
+
+We want to see `handleMsgObservedTxOut` but we don't.  
+Are we hitting `TxOutStorageVCUR.addToBlockOut` in maya? Yes.  
+Are we hitting `Signer.processTransaction` in bifrost? No... Why?  
+
+At most once a second, we call `Signer.processTransactions` in bifrost.  
+
+That calls `pipeline.SpawnSignings` which I assume is where I need to look for
+that maya tx out which disappears into the abyss.  
+
+Yeah I don't think it's reaching bifrost at all.
+
+I've added logging on the mayanode side all the way down to `k.cdc.MustMarshal`
+in `KVStore.setTxOut` just before `store.Set(TxOut)`. This is the last place I
+know of within the boundary of mayanode we deal with the txout.
+
+```
+@setTxOut can marshal? txout//30 {30 [To Address:addr_test1vz8sgnvw3hfl9rruz9xhkeuffmehe0p8793hs6zh5kucapqhl4qdkAsset:ADA.ADAAmount:4377567Memo:OUT:29D372061F64EC605714D176BF3FC1B9B5F0170734D259B37B20272610F916F2GasRate:233000]}
+did marshal!
+```
+
+How bizare. It gets there. It marshals it. It sets it on the store.  
+The key is `txout//30`.  
+So it must be bifrost then?  
+Oh it should be `txout-v4`? Nope dash worked with just `txout`.  
+Although the iterator in SignerStore.List uses `txout-v4` as the prefix so wtf??  
+
+> bifrost/signer/sign.go:250 > Received a TxOut Array of ...
+
+`Signer.processTxnOut`  
+I'm onto something else: `ThorchainBlockScan.processTxOutBlock`  
+
+Okay looks like that key txout//28 is for ALL the txs of maya block 28.  
+I get a corresponding txout count of 1 in bifrost for dash in `ThorchainBlockScan.processTxOutBlock`.  
+
+Ahh I think I've got it.  
+The bifrost public key manager isn't aware of the eddsa keys is it?  
+
+Looking at `PubKeyManager.GetNodePubKey`.  
+It should return all of the node keys.  
+Maybe we refactor to `GetNodePubKeySet`?  
+
+I have a good feeling about this time...  
+Can we get a bloody ada swap tx out??  
+
+> #!# Client.SignTxpanic: runtime error: invalid memory address or nil pointer dereference
+> [signal SIGSEGV: segmentation violation code=0x2 addr=0x0 pc=0x106293dcc]
+
+brutal.
+
+> INF bifrost/pkg/chainclients/shared/runners/solvency.go:37 > finish  solvency check runner chain=ADA service=bifrost
+> INF bifrost/signer/sign.go:676 > receive request to stop signer module=signer service=bifrost
+
+That seemingly just shut down the bifrost mid test??
+
+> ERR bifrost/signer/sign.go:600 > fail to sign tx error="fail to tss sign: fail tss keysign: fail to get local keygen state: invalid pub key length 32" module=signer service=bifrost
+> ERR bifrost/signer/sign.go:734 > fail to sign and broadcast tx out store item error="fail to tss sign: fail tss keysign: fail to get local keygen state: invalid pub key length 32" module=signer service=bifrost
+
+Failing at `c.tssKeySigner.RemoteSign` in bifrost cardano client `SignTx`.  
+I wonder if `tx.VaultPubKey` is the wrong type?  
+No it is the eddsa key.  
+
+I think I've missed the eddsa tss code.
+
+20m left on the clock. I think I'll call it for today.  
+Just need to find wherever that is and pull/merge it in...  
+
+Segway: GetEDDSAPubKey, shouldn't it just be GetEDPubKey? They're both DSAs.
+
+tmayapub1zcjduepqaepvkj94hgxxpgfqr7uulzh3lun5sn08qhd2ha2t6jc77yqtpy4srcw7vu
+
+before the txout is handed off to cosmos, later to be picked up by that bifrost `processTransactions` func.
+
+#### 05.03.2025 Wednesday 4h
+
+Right, coming back to this next morning Itz has mentioned
+`thorchian:pluto/eddsa2`, the branch with eddsa tss. I've done vault/pool eddsa,
+but protocol eddsa tss signing is a missing piece of the puzzle.
+
+Committed what I have so far trying to avoid all the dodgy logs. There are many,
+a few may have slipped through. Will have to go through my entire MR with a fine
+tooth comb anyway.
+
+Update this:  
+`gitlab.com/thorchain/tss/tss-lib v0.1.5`  
+to v0.1.6  
+
+go get gitlab.com/thorchain/tss/tss-lib@v0.1.5
+
+
+Looks we're going with ECDSA and EDDSA which I can almost guarantee will
+introduce errors at some point for being so visually simillar. Plus they're both
+"EC", as I mentioned before. I'd go with `Edwards()` or `Secp()`
+
+Itzamna shared `beorn/eddsa-rc` as the branch containing `go-tss` with edwards
+support.
+
+- [ ] Set `github.com/binance-chain/tss-lib/common` to the same version
+- [ ] Double check we can update the go-tss Makefile and still have protob covered
+
+```
+module = gitlab.com/mayachain/mayanode/bifrost/tss/go-tss
+
+.PHONY: clear tools install test test-watch lint-pre lint lint-verbose protob build docker-gitlab-login docker-gitlab-push docker-gitlab-build
+
+all: lint build
+
+clear:
+  clear
+
+tools:
+  go install ./cmd/tss-recovery
+  go install ./cmd/tss-benchgen
+  go install ./cmd/tss-benchsign
+
+install: go.sum
+  go install ./cmd/tss
+
+go.sum: go.mod
+  @echo "--> Ensure dependencies have not been modified"
+  go mod verify
+
+test:
+  @go test --race ./...
+
+test-watch: clear
+  @gow -c test -tags testnet -mod=readonly ./...
+
+unittest:
+  @go test --race -v -coverprofile=coverage.out -timeout 15m ./...
+  @go tool cover -func=coverage.out
+
+lint-pre:
+  @gofumpt -l cmd common keygen keysign messages p2p storage tss # for display
+  @test -z "$(shell gofumpt -l cmd common keygen keysign messages p2p storage tss)" # cause error
+  @go mod verify
+
+lint: lint-pre
+  @golangci-lint run
+
+lint-verbose: lint-pre
+  @golangci-lint run -v
+
+protob:
+  protoc --go_out=module=$(module):. ./messages/*.proto
+
+build: protob
+  go build ./...
+
+docker-build:
+  docker build -t registry.gitlab.com/thorchain/tss/go-tss .
+```
+
+```
+github.com/binance-chain/tss-lib => gitlab.com/thorchain/tss/tss-lib v0.1.6
+```
+
+```
+--- FAIL: TestSignatureNotifierBroadcastFirst (0.02s)
+    signature_notifier_test.go:160: 
+          Error Trace:  /Users/adc/go/src/gitlab.com/mayachain/mayanode/bifrost/tss/go-tss/keysign/signature_notifier_test.go:160
+          Error:        map[string]*keysign.notifier{} does not contain "be691deff2fbb18564d1caf54b6a37bc9951363e3151eaf542fad0c8b881d8b6"
+          Test:         TestSignatureNotifierBroadcastFirst
+panic: runtime error: invalid memory address or nil pointer dereference [recovered]
+  panic: runtime error: invalid memory address or nil pointer dereference
+[signal SIGSEGV: segmentation violation code=0x2 addr=0x0 pc=0x1018474e8]
+```
+
+`go-tss` tests not passing on that `beorn/eddsa-rc` branch. Are there new commits?  
+Nope.  
+
+
+This is the commit on TC which adds eddsa: `f425cc44517d838a3a94edf6421bb0267220e238`  
+After merging in only the go-tss code, I'm getting this:
+
+```
+4:16PM ERR bifrost/signer/sign.go:600 > fail to sign tx error="fail to tss sign: fail tss keysign: fail to get local keygen state: stat /Users/adc/.mayanode/localstate-tmayapub1zcjduepq4y5ktgjydyluvh9n6u3hrjgppgpx8z023tkhxjlxrc9vugdeu8cqls5h0q.json: no such file or directory" module=signer service=bifrost
+```
+
+So `tmayapub1zcjduepq4y5ktgjydyluvh9n6u3hrjgppgpx8z023tkhxjlxrc9vugdeu8cqls5h0q` is not the secp key, it's the eddsa key.  
+
+Comparing my attempt with beorn/eddsa-rc and bringing in the things I missed in my attempt...  
+Actually they're quite different implementations.  
+
+Interestingly, he's added `VaultPubkeyEddsa` to the `TxOutItem`.  
+I've just used the signing key, because that's how I assumed we'd lookup other members.  
+This could get messy if we keep adding different key types.  
+I don't think he's covered retrieving a vault by eddsa key?  
+
+I think he's not worrying about adding an eddsa index for vaults, and I'm not
+sure how that can work.
+
+
+#### 09.03.2025 Sunday 5h
+
+f425cc44517d838a3a94edf6421bb0267220e238
+
+Why did he remove this in signer:
+```
+for _, item := range na.GetSignerMembership() {
+  pubkeyMgr.AddPubKey(item, true)
+}
+```
+
+Double checking the diff...
+
+- signer/sign - HUGE CHANGES
+- tx_out
+- thorchain (mayachain)
+- tss/blame/policy
+- tss/blame/policy_test
+- mock_tss_server
+- go-tss/*
+- keygen
+- localstate-test
+- health_test
+- address NO
+  Didn't do this one because we're in a very different place, they're targeting
+  SOL, and we already have logic in for ADA.
+- chain NO see above
+- pubkey NO see above
+- openapi/* - we're using refs here which is much better, but harder to diff against tc, TC MISSING YGG EDDSA KEY?
+- proto/* - see below
+- test/* TBC THIS SCARES ME COME BACK LATER
+- tools/events/security - we don't have this
+- x/.../keeper/v1 - nothing major
+- x/.../types
+- type_tss_test - added `TestConsensusCheckSignature`
+- type_vault - I added quite a few additional get address/pubkey funcs
+- handler_tss - EXTREMELY DIFFERENT
+- handler_tss_keysign
+- handler_tss_test
+- helpers - POTENTIAL ERROR see todo
+- manager_network_current
+- manager_txout_current
+- querier
+- querier_quotes
+- thorchain_test (needs to be renamed)
+
+---
+
+proto
+
+Hard to locate significant changes, so many formatting/spacing changes.  
+Highlights how important decent formatting is from the get go.  
+Really puts the diff in difficult.  
+Generating patch files for AI to analyse for significant changes is incredible.  
+This is what claude picked out:  
+
+> Only One Minor Functional Addition: There appears to be a new field added to several message types:
+> 
+> In ObservedTx (proto/thorchain/v1/types/type_observed_tx.proto): Added string observed_pub_key_eddsa field  
+> In TssVoter (proto/thorchain/v1/types/type_tss.proto): Added string pool_pub_key_eddsa field  
+> In Vault (proto/thorchain/v1/types/type_vault.proto): Added string pub_key_eddsa field  
+> In VaultInfo (proto/thorchain/v1/types/query_vault.proto): Added string pub_key_eddsa field  
+> 
+> One Rename:
+> 
+> In TssKeysignFailVoter (proto/thorchain/v1/types/type_tss_keysign.proto): Renamed int64 round7_count = 7 to int64 last_round_count = 7
+
+We're using the openapi types to return from querier, TC is using the protobuf
+files. Seems like the former is more appropriate so I'll ignore that.
+
+---
+
+types
+
+> Addition of EdDSA Support:
+> 
+> A new PoolPubKeyEddsa field has been added to the MsgTssPool struct to support EdDSA public keys  
+> A new NewMsgTssPoolV2 constructor function was created that includes an EdDSA public key parameter  
+> The ObservedTx struct has been updated with a new ObservedPubKeyEddsa field  
+> 
+> Vault-Related Changes:
+> 
+> Added PubKeyEddsa field to the Vault struct  
+> Created a new NewVaultV2 constructor function that includes an EdDSA public key parameter  
+> Added a GetAddress method to the Vault struct that chooses between ECDSA or EdDSA addresses based on the chain's signing algorithm  
+> Added PubKeyEddsa to QueryVaultResponse and VaultInfo structs  
+> 
+> TSS-Related Changes:
+> 
+> Updated NewTssVoter to include EdDSA public keys  
+> Added PoolPubKeyEddsa field to the TssVoter struct  
+> Modified TssKeysignFailVoter to rename Round7Count to LastRoundCount (likely to be more generic)  
+
+---
+
+handler_tss
+
+This is QUITE different. Functions map like:
+
+`validateV110` to `MsgTssPoolValidateV3_0_0`  
+`handleV93` to `MsgTssPoolHandleV3_0_0`  
+
+I'm just going to follow the TC diff rather than our ver to TC diff.
+
+---
+
+helpers
+
+I'm seeing VaultPubKey set from tx.ObservedPubKey, but we're ignoring
+tx.ObservedPubKeyEddsa here.
+
+In thorchain it's just `refundTx` and for maya it's `refundTxV112`.
+
+Just going to add a todo here for now...
+
+There's also a load of fields unnecessarily set to default values.  
+I'm assuming an IDE autogen that wasn't cleaned up.  
+
+---
+
+One small improvement I think we can make is to always keep subsequent
+version "constructor" funcs in the same file near each other with deprecation
+warnings on the older versions, to make it really clear that:
+- the old version is superceeded
+- which version to use instead and why
+- how to use the new version (without having to search for it in another file)
+
+For that reason I just deleted `msg_tss_pool_v2` and moved `NewMsgTssPoolV2` into
+`msg_tss_pool` underneath v1.
+
+---
+
+Why would a YggdrasilVault not also need to have an eddsa pubkey?  
+I think it does, looks like an oversight there.  
+
+---
+
+There's this in `handler_tss`:
+
+```go
+if msg.KeygenType != AsgardKeygen {
+  return fmt.Errorf("only asgard vaults allowed for tss")
+}
+```
+
+Just a note/reminder for me: Yggdrasil vaults are owned by a single validator,
+so we only want tss for the larger asgard vaults managed by the set of bonded /
+churned nodes.
+
+---
+
+okay that's all the changes from `beorn/eddsa-rc`.
+
+Of particular concern:
+- `handler_tss`
+- `type_tss`
+- `MsgTssPool.Secp256K1Signature`
+
+I'm also not sure about updating the current version of things.  
+Might need to duplicate logic to make versionX updates.  
+
+```
+git diff > ~/Downloads/remove_comments.patch
+git apply --cached --reverse ~/Downloads/remove_comments.patch
+```
+
+Getting the unit tests working again.  
+
+Why bother with `GetKeygenStdTx`? It's just a direct passthrough?
+
+dash client took 115s. wtf.  
+
+```
+----------------------------------------------------------------------
+FAIL: handler_tss_test.go:171: HandlerTssSuite.TestTssHandler
+
+handler_tss_test.go:675:
+    c.Assert(errors.Is(err, tc.expectedResult), Equals, true, Commentf("name:%s, %s", tc.name, err))
+... obtained bool = false
+... expected bool = true
+... name:fail to get tss voter should return an error, invalid secp256k1 check signature: unknown request
+
+Bond provider unbond himself
+Bond provider unbond bp2
+Bond provider unbond himself without address
+Node operator unbond bp3
+Node operator unbond himself
+262500000
+voter FD3D5DDEA6642ADA3BED898ABDCB5173D629E49DE8DEC8F0D8489808A5F5BC4C
+
+----------------------------------------------------------------------
+FAIL: thorchain_test.go:207: ThorchainSuite.TestChurn
+
+thorchain_test.go:313:
+    c.Assert(err, IsNil)
+... value *errors.wrappedError = invalid secp256k1 check signature: unknown request [/Users/adc/go/src/gitlab.com/mayachain/mayanode/common/cosmos/cosmos.go:106] (invalid secp256k1 check signature: unknown request)
+
+OOPS: 661 passed, 2 FAILED
+--- FAIL: TestPackage (2.66s)
+FAIL
+FAIL  gitlab.com/mayachain/mayanode/x/mayachain 3.841s
+ok    gitlab.com/mayachain/mayanode/x/mayachain/aggregators (cached)
+[111 108 105 109 47 47 66 78 66 46 66 78 66 62 46 47 48 48 48 48 48 48 48 48 48 48 48 48 48 48 48 48 48 48 47]
+
+----------------------------------------------------------------------
+FAIL: keeper_vault_test.go:69: KeeperVaultSuite.TestVaultV2
+
+keeper_vault_test.go:82:
+    c.Assert(err, IsNil)
+... value *fmt.wrapError = &fmt.wrapError{msg:"vault with pubkey(tmayapub1addwnpepqv4rmld9nmyu76w2sywa3ctmygv7rlt0a060zcy2xdj2re3agme4yujjs00) doesn't exist: vault not found", err:(*errors.errorString)(0x1077befe0)} ("vault with pubkey(tmayapub1addwnpepqv4rmld9nmyu76w2sywa3ctmygv7rlt0a060zcy2xdj2re3agme4yujjs00) doesn't exist: vault not found")
+
+OOPS: 60 passed, 1 FAILED
+--- FAIL: TestPackage (0.08s)
+FAIL
+FAIL  gitlab.com/mayachain/mayanode/x/mayachain/keeper/v1 1.750s
+ok    gitlab.com/mayachain/mayanode/x/mayachain/memo  (cached)
+ok    gitlab.com/mayachain/mayanode/x/mayachain/query (cached)
+ok    gitlab.com/mayachain/mayanode/x/mayachain/types 0.504s
+FAIL
+```
+
+This:
+
+```
+return cosmos.ErrUnknownRequest("invalid secp256k1 check signature")
+```
+
+Doesn't look like the right return error for `validateV110`. I've taken it from
+TC. Surely the request is known, it's a signature check?
+
+Also, the way TC wrap errors is different to maya, which results in slightly
+different error strings and therefore breaks the tss test:
+
+```go
+// Thorchain 
+// output: `invalid secp256k1 check signature`
+
+func ErrUnknownRequest(msg string) error {
+  return se.ErrUnknownRequest.Wrap(msg)
+}
+
+// Mayachain
+// output: `invalid secp256k1 check signature: unknown request`
+
+func ErrUnknownRequest(msg string) error {
+  return se.Wrap(se.ErrUnknownRequest, msg)
+}
+```
+
+It was edited by TC with this commit: `Thorchain cosmos-sdk v0.50.x upgrade #check-lint-warning`
+
+I'll probably leave this one to the maya guys unless I HAVE to update cosmos.  
+Currently on `v0.45.9`  
+
+#### 11.03.2025 Tuesday 8h
+
+Itz mentioned the `matt/cardano` branch.
+
+Just had a read through of the design document from the matt branch. Looks like
+he was weighing up gouroboros/direct node with dolos/light node but went with
+the former. I did the same, but am running that inside a lightweight sidecar
+storing block/tx indexes so we can query the cardano node directly with a
+simplified api. Will keep an eye on it.
+
+Back to the unit tests. `fail to get tss voter should return an error`.  
+
+`fail to get tss voter: kaboom`.  
+We're trying to `GetTssVoter` for the `MsgTssPool.ID`.  
+`verifySecp256K1Signature` is failing.  
+
+Missed this bypass in the tests, seems safe right?? 😕
+
+```go
+// bypass signature checks on TssPool messages
+verifySecp256K1Signature = func(_ common.PubKey, _ []byte) error {
+  return nil
+}
+```
+
+Next failing test:
+
+> name:fail to get tss voter should return an error, signer doesn't have enough rune
+
+
+My debugger is jumping around all over the place. Trying go update.  
+`1.23.5 -> 1.24.1`  
+
+> cannot define new methods on non-local type RustBuffer
+
+Damn, downgrading to `1.23.7` as that's a problem with the way the radix go lib
+is coded.  
+
+```
+mkdir -p /opt/homebrew/opt/go
+ln -s /opt/homebrew/opt/go@1.23/libexec /opt/homebrew/opt/go/libexec
+```
+
+```go
+x1, err := k.GetNodeAccount(ctx, signer)
+x2, err := k.CalcNodeLiquidityBond(ctx, x1)
+```
+
+Asked Itzamna for a hint in case he can save me a load of time trying to
+understand this.
+
+So there's 1 provider, but with 0 bond apparently.  
+
+Ooops forgot that damnable `--tags mocknet` arg, that was it.
+
+```
+keeper_vault_test.go:82:
+    c.Assert(err, IsNil)
+... value *fmt.wrapError = &fmt.wrapError{msg:"vault with pubkey(tmayapub1addwnpepqgz7mptfvasvsl44fje8slfs8tveduflauvdh3yxetc23zccr2gn7cwjr63) doesn't exist: vault not found", err:(*errors.errorString)(0x106f22fe0)} ("vault with pubkey(tmayapub1addwnpepqgz7mptfvasvsl44fje8slfs8tveduflauvdh3yxetc23zccr2gn7cwjr63) doesn't exist: vault not found")
+```
+
+We have an `.editorconfig` file with `indent_style = space` and yet so many
+files are intented with tabs. I'm just going to change that.
+
+Unit tests passing, now can we sign a cardano tx now?
+
+> ERR bifrost/signer/sign.go:659 > fail to sign tx error="fail to tss sign: fail
+  tss keysign: fail to get local keygen state:
+  stat /Users/adc/.mayanode/localstate-tmayapub1zcjduepqwza0aks6q4vw2dst5a74n7h88988745ml6rkwcxehetdzzzlhhxqvyhpgd.json:
+  no such file or directory" module=signer service=bifrost
+
+> ERR bifrost/signer/sign.go:659 > fail to sign tx error="fail to tss sign: fail tss keysign: decoding Bech32 address failed: must provide a non empty address" module=signer service=bifrost
+
+Struggling a bit conceptually with this one. How do I actually use this remote sign?
+
+If I use `c.tssKeySigner.RemoteSign(txHash, tx.VaultPubKeyEddsa.String())` I get the above error.
+
+If I use `c.tssKeySigner.RemoteSign(txHash, tx.VaultPubKey.String())` I get the localstate no such file error.
+
+I HAVE to pass the eddsa key in there, because otherwise there's nothing to
+indicate the tx hash bytes are needing to be signed by the eddsa vault keys.
+
+
+bifrost/types `TxOutItem.VaultPubKeyEddsa`  
+
+This is confusing me a little. We don't really need a field for every key type
+we want to support, we can just set vaultpubkey and then let the logic dictate
+how to find that vault.  
+
+I'm getting rid of it. I think it complicates things and I can't get my head around it.
+
+Cause now I have a txout with pubkey unset and pubkeyeddsa set.
+
+Yeah basically you can search `RemoteSign(` in TC and see there are no places
+where we're passing an eddsa key yet.
+
+cardano client SignTx  
+tss_signer RemoteSign  
+processKeySignTasks  
+toLocalTSSSigner  
+tssServer.KeySign  
+
+Signer processTransaction
+
+> fail to get local keygen state
+
+We're getting this because `LocalStateManager.GetLocalState` is being called
+before `LocalStateManager.SaveLocalState`, so there's no state to retrieve.
+
+
+```
+if w.pubKey.Equals(poolPubKey) {
+  v1PrivateKey, _ := btcec.PrivKeyFromBytes(btcec.S256(), w.privateKey.Serialize())
+  return txscript.NewPrivateKeySignable(v1PrivateKey)
+}
+```
+
+Ahh, for other clients, the tss wrapper will NOT use tss if they private key
+matches the local key. That explains why I'm able to swap ada to dash but not
+visa versa.
+
+Next issue. bifrost/mayaclient/keys has `GetPrivateKey`.  
+It's used in the dash client in the `KeySignWrapper` to either do local OR tss signing.  
+No eddsa support though and this goes back to cosmos keychain so if there's no support I'm kinda stuck.  
+
+adr-071-crypto-v2-multi-curve.md
+
+cosmos `v0.45.9`
+
+```go
+kr, _ := keyring.New("", "", "", nil)
+keys, _ := kr.List()
+for _, key := range keys {
+  key.GetPubKey()
+  key.GetAddress()
+}
+```
+
+cosmos `v0.52.0-rc.2`
+
+```go
+kr, _ := keyring.New("", "", "", nil, nil)
+kr.ImportPrivKey()
+keys, _ := kr.List()
+for _, key := range keys {
+  pk, _ := key.GetPubKey()
+
+  switch pk.Type() {
+  case ed25519.KeyType:
+  case secp256k1.keyType: // They actually dont expose this
+  }
+  key.GetType()
+  key.GetPubKey()
+  key.GetAddress()
+}
+```
+
+Now there's `GetType() string` and support for:
+- bls12_381
+- ed25519
+- secp256k1
+- secp256r1
+
+We already have a KeySet though.
+
+Maybe this:
+
+```go
+ed25519PrivKey := eddsaKey.GenPrivKeyFromSecret([]byte(m))
+edd2519ConsPubKey, err := cosmos.Bech32ifyPubKey(cosmos.Bech32PubKeyTypeConsPub, ed25519PrivKey.PubKey())
+if err != nil {
+  log.Fatal().Err(err).Msg("failed to bech32ify EdDSA cons pubkey")
+}
+ed25519PubKey, err := cosmos.Bech32ifyPubKey(cosmos.Bech32PubKeyTypeAccPub, ed25519PrivKey.PubKey())
+if err != nil {
+  log.Fatal().Err(err).Msg("failed to bech32ify EdDSA acc pubkey")
+}
+```
+
+Can I access the mnemonic from the bifrost client?  
+Should I??  
+
+Apparently only `secp256k1` is supported at the moment by:  
+`github.com/cosmos/cosmos-sdk/crypto/keyring.Keyring`  
+
+If I run `mayanode keys list --keyring-backend file` I just get:
+```
+- name: mayachain
+  type: local
+  address: tmaya1mhhh9zn5ckeu4knfd9g9nyautccy2sg0dv7tdn
+  pubkey: '{"@type":"/cosmos.crypto.secp256k1.PubKey","key":"Asdnni/4kP9BszE69D83TOQLmj3d4402HmuzCcR0heT4"}'
+  mnemonic: ""
+```
+
+---
+
+Right I've come across the next major roadblock.
+
+I wasn't able to sign ada txouts because it was trying to use tss, and that
+wasn't established with just my single maya/bifrost (I think).
+
+The other clients just sign directly with the secp private key from the local
+keychain IF it can sign the txout (bypassing all this tss stuff which is a bit
+worrying from a local test perspective, see `KeySignWrapper`)
+
+Mnemonics from other curves are formatted differently with their own word lists.  
+ed25519 is not supported in the cosmos keyring:  
+cosmos-sdk(v0.52 rc2) crypto/hd/algo.go:30  
+
+> // Ed25519Type represents the Ed25519Type signature system.
+> // It is currently not supported for end-user keys (wallets/ledgers).
+> Ed25519Type = PubKeyType("ed25519")
+
+That's the latest cosmos version. Thoughts?
+
+---
+
+`TestInMemoryKeyManagement`
+
+In genesis atm I'm doing this which generates a secp key:
+
+```
+mayanode keys --keyring-backend file --output json add mayanode
+```
+
+We need a ed25519 key as well:
+
+```
+cat > ed25519-key-temp <<EOF
+-----BEGIN TENDERMINT PRIVATE KEY-----
+kdf: bcrypt
+salt: 535B37BD51FBD12A9092986144C554CF
+type: ed25519
+
+NE9+1uALjChjPVHO/1N3yw9TE3fHL11Cr+HgUS94I5W4huEJWAN/TPoit2iUXeT5
+uq6qvJb/adctBNJIlafHesg9SUxbV81A6PaiGjDqC/zz4OpZG7yH3kp1PeGKYsqA
+yKAUeonyxu0j7uP73Q==
+=iQEP
+-----END TENDERMINT PRIVATE KEY-----
+EOF
+
+echo "$SIGNER_PASS\n$SIGNER_PASS" mayanode keys --keyring-backend file import mayanode-eddsa ./ed25519-key-temp
+```
+
+Need to make that a lot nicer. 
+
+#### 12.03.2025 Wednesday 2h
+
+Added `GetPrivateKeyEddsa()` func to `Keys` (which is passed to each bifrost client).  
+The `nodePubKey` for dash corresponds to the inbound address `pub_key`.  
+
+DASH
+nodePubKey tmayapub1addwnpepqfk3eynlspad3jxg52fjjqczk3vv0gh4ueftesu3mpy039a9e4jp2at6g2n
+address    yghaEtiqVaug3jNp6HF3VkcF7Hr21Fhe2k
+
+But not for cardano.  
+
+ADA
+pubKeyBech32 tmayapub1zcjduepqzc06p9vpys4nac2gg7jummmgllthg69n4egqnst7yvqfq8jjjayqe5fkcv
+nodePubKey   tmayapub1zcjduepqzc06p9vpys4nac2gg7jummmgllthg69n4egqnst7yvqfq8jjjayqe5fkcv
+address      addr_test1vpv5clplhp8nvzfc737fqztvlj2mc90v0y83g47jv0tests4tv4n2
+
+Asgard vault keys are set via `handler_tss` and `manager_network_current`.  
+
+The validator needs the correct key set. Is that in genesis?  
+Yes. And herein lies our problem:
+
+```
+printf "%s\n%s\n" "$SIGNER_PASSWD" "$SIGNER_MNEMONIC" | mayanode ed25519
+```
+
+Right, so we have this file: `BASEChain-ED25519` being generated by the above
+command. It's a separate keyring altogether. Whyyyy.
+
+I was going to suggest just adding the eddsa key to the normal keyring:
+
+```
+Enter keyring passphrase:
+- name: mayachain-eddsa
+  type: local
+  address: tmaya1k8gmr3l2u5cmq70mf6ugq7pqagf534q8xsrk3x
+  pubkey: '{"@type":"/cosmos.crypto.ed25519.PubKey","key":"Fh+glYEkKz7hSEelze9o/9d0aLOuUAnBfiMAkB5Sl0g="}'
+  mnemonic: ""
+- name: mayachain
+  type: local
+  address: tmaya1m7gavvwqqj4xny0grz2egsux5426y9gygq3ces
+  pubkey: '{"@type":"/cosmos.crypto.secp256k1.PubKey","key":"Am0ckn+AetjIyKKTKQMCtFjHovXmUrzDkdhI+JelzWQV"}'
+  mnemonic: ""
+```
+
+Then all other key types could just be `<signer_name>-<key_type>`.  
+
+Now we have this other file being generated in a different location outside the
+keyring passed to all the bifrost clients.  
+
+mayanode pubkey
+mayanode ed25519
+
+Maybe I can have a script that will just coalesce these keyrings so I don't have
+to refactor any more code (to pass in an additional keyring)
+
+So we're merging `BASEChain-ED25519` into `./keyring-file/mayachain.info`
+
+```
+cp ./keyring-file/mayachain.info ./keyring-file/mayachain.info.bak
+cp BASEChain-ED25519 BASEChain-ED25519.bak
+mv BASEChain-ED25519 ./keyring-file/mayachain.info
+
+cp ./BASEChain-ED25519.bak ./BASEChain-ED25519
+cp ./keyring-file/mayachain.info.bak ./keyring-file/mayachain.info
+
+mayanode keys --keyring-backend file delete mayachain-eddsa
+mayanode keys --keyring-backend file list
+mayanode keys --keyring-backend file --keyring-dir 
+
+mayanode keys mnemonic
+gossip good celery one zoo hockey normal proof universe clown orchard tackle million dry keep person ribbon cable found balcony picture differ puppy elder
+mayanode ed25519
+tmayapub1zcjduepqjjykp00pv32hhwqulqfm95zwwdwuyetj2xsl63uph6j4nrkkwefqvndgy7
+
+
+```
+
+Problem 1: You can configure the keyring directory but not the name, so we can't
+select the dodgy `BASEChain-ED25519` file with this command.
+
+690dad153d0a096d617961636861696e1226eb5ae98721026d1c927f807ad8c8c8a293290302b458c7a2f5e652bcc391d848f897a5cd64151a25e1b0f79b20a87bf47dcee7dcc978dd6223a78bfc3be70c8a829ddbea890ae9f569a4edef7d2209736563703235366b31
+
+#### 13.03.2025 Thursday 6h
+
+I was under the impression that you need a different mnemonic for different curves
+but looking at that `mayanode ed25519` command, I think they're just using the
+typical `mayanode mnemonic` result.
+
+```
+mayanode mnemonic
+claim witness awkward drill invite clog sure pulse assume toddler allow bulk pumpkin noodle minor brother special lab endless wrist long month come fan
+
+mayanode ed25519
+tmayapub1zcjduepqgnsvv438py77sfxplpxcrsltgajh33y7flyr0ydvrw7hxrup0ats0ggsrn
+
+mnemonicToEddKey
+084f6ba95d8c0c8ac5bfab3cbf9d258b27e127ec6a5c19ac66ac539bd832644b
+
+extract BASEChain-ED25519
+04ee885a002d7d8bd8e0417a83e4caa7f73319ffc70821e7984d7b08c35cd7aa
+tmayapub1zcjduepqkwusxtlvftc9a5jxcgkgz28937uw5wa8s9zle4txumc6p35xnzvsc2ayjs
+```
+
+Yeah I'm extracting the hd master key without deriving the next key.  
+
+Okay I have a go command now to import the edwards key from the extra file into
+the standard keychain. Maybe the safest approach is just to keep both.
+
+```
+mayanode keys --keyring-backend file delete mayachain-ed25519
+```
+
+```
+go run ./_cmd/keyring
+
+Copying ed25519 key from './BASEChain-ED25519' to './keyring-file/mayachain.info' keychain
+privKey    04ee885a002d7d8bd8e0417a83e4caa7f73319ffc70821e7984d7b08c35cd7aa
+pubKey     44e0c65627093de824c1f84d81c3eb476578c49e4fc83791ac1bbd730f817f57
+bechPubKey tmayapub1zcjduepqgnsvv438py77sfxplpxcrsltgajh33y7flyr0ydvrw7hxrup0ats0ggsrn
+addr       addr1vynt4pd5yu64w6ve2y8aszv6ywks7j7t0n0x54uzusx5jsc7dwea5
+Imported edwards key to keyring as 'mayachain-ed25519'
+ok!
+```
+
+Ok that's a thing of beauty.
+
+- [ ] Turn that into `mayanode ed25519-import`
+
+```
+func (w *KeySignWrapper) GetSignable(poolPubKey common.PubKey) txscript.Signable {
+  if w.pubKey.Equals(poolPubKey) {
+    // ygg
+  }
+  // tss
+}
+```
+
+```
+func (c *Client) signUTXO(redeemTx *wire.MsgTx, tx stypes.TxOutItem, amount int64, sourceScript []byte, idx int, mayachainHeight int64) error {
+  signable := c.keySignWrapper.GetSignable(tx.VaultPubKey)
+  ...
+}
+```
+
+So to simplify:
+
+```
+if tx.VaultPubKey.Equals(client.nodePubKey) {
+  // sign
+} else {
+  // tss remote sign
+}
+```
+
+privKey    0968047d836b2ce55a2d64fa5ea8bc9c1b4030fe9db99c8ba2e184a348fa186034685d418d4c5ef83349c19d7c82a366fb369ef43d58d245d8f3cf43805ecf54
+bechPubKey tmayapub1zcjduepqx3596svdf300sv6fcxwheq4rvmand8h584vdy3wc70858qz7ea2qsqueau
+addr       addr_test1vza9p839s63zqhpp93j90cdgf2n2uraxmhvafqgftc8satgks64xh
+
+tx.VaultPubKey tmayapub1zcjduepqx3596svdf300sv6fcxwheq4rvmand8h584vdy3wc70858qz7ea2qsqueau
+LOCAL SIGN
+fromPublicKey tmayapub1zcjduepqx3596svdf300sv6fcxwheq4rvmand8h584vdy3wc70858qz7ea2qsqueau
+priv: 0968047d836b2ce55a2d64fa5ea8bc9c1b4030fe9db99c8ba2e184a348fa186034685d418d4c5ef83349c19d7c82a366fb369ef43d58d245d8f3cf43805ecf54
+txHash: ad8a9a71dbd630f8bfb64abed73d034b3ca21beff147459b41957db80516ab16
+signature: c3654a750cdf6cbd36336a455012fabb44af311c642763fbe5c7985032ef704c54fc777032be8bdc0cd91c08052ba92f04bcbcafb281c888bd28ff3fe353210e
+4:48PM ERR bifrost/signer/sign.go:660 > fail to sign tx error="failed to verify signature" module=signer service=bifrost
+
+privKey    03badc950910381d20d89ce146ee25a42ea79725cdf28945c2b085cf1b10b63b
+pubKey     5ecaf14ae7687715f7afbc7f1fc649b271fb9bc5165e21d16362adbbc6bbfec3
+bechPubKey tmayapub1zcjduepqtm90zjh8dpm3taa0h3l3l3jfkfclhx79ze0zr5trv2kmh34mlmps72hmcl
+addr       addr_test1vzz2vymdst7assyv62mf8ky828xefshlf847gt2k995r4js3fd2q3
+
+
+When trying to use `github.com/decred/dcrd/dcrec/edwards`:
+
+```go
+priv, err := edwards.GeneratePrivateKey(edwards.Edwards())
+if err != nil {
+  log.Fatal().Msgf("%+v", err)
+}
+
+data := []byte("test")
+
+r, s, err := edwards.SignFromSecretNoReader(priv, data)
+if err != nil {
+  log.Fatal().Msgf("%+v", err)
+}
+
+ok := edwards.Verify(priv.PubKey(), data, r, s)
+
+fmt.Printf("ok %t\n", ok)
+```
+
+Crashes with a SIGSEGV. Not good.
+
+```go
+priv, err := edwards.GeneratePrivateKey(edwards.Edwards())
+if err != nil {
+  log.Fatal().Msgf("%+v", err)
+}
+
+fmt.Printf("%x\n", priv.SerializeSecret())
+```
+
+Prints nothing. Try v2?
+
+> go: upgraded github.com/decred/dcrd/dcrec/edwards/v2 v2.0.0 => v2.0.3
+
+```go
+// SerializeSecret returns the 32 byte secret along with its public key as 64
+// bytes.
+func (p PrivateKey) SerializeSecret() []byte {
+...
+```
+
+No it doesn't. It's empty.
+
+```go
+priv, err := edwards.GeneratePrivateKey()
+if err != nil {
+  log.Fatal().Msgf("%+v", err)
+}
+fmt.Printf("%x\n", priv.SerializeSecret())
+```
+
+Zilch.
+
+The problem is the old edwards key was generated using this library, and the
+new eddsa tss code uses it too.
+
+This seems to work:
+
+```go
+priv, err := edwards.GeneratePrivateKey()
+if err != nil {
+  log.Fatal().Msgf("%+v", err)
+}
+privpub := append(priv.Serialize(), priv.PubKey().Serialize()...)
+fmt.Printf("%x\n", privpub)
+```
+
+> 04465a992f22987c3a616a0dd4925d6e9b641f0f7fcfaac2d805c8b8854cbc3ef65623de2d72a9d5d77e4f58d2f312da823b9f465f99104b9ccd9c161a79663b
+
+If you try and interop with the other ed25519 library:
+
+```go
+priv2 := ed25519.NewKeyFromSeed(privpub)
+fmt.Printf("%x\n", priv2)
+```
+
+> panic: ed25519: bad seed length: 64
+
+I'm not sure if `FromSeed` is the right way to use it, and I'll gloss over the
+fact that public packages should NEVER PANIC!!!!!
+
+So this looks like how we convert:
+
+```go
+priv, err := edwards.GeneratePrivateKey()
+if err != nil {
+  log.Fatal().Msgf("%+v", err)
+}
+privpub := append(priv.Serialize(), priv.PubKey().Serialize()...)
+fmt.Printf("%x\n", privpub)
+
+priv2 := ed25519.PrivateKey(privpub)
+fmt.Printf("%x\n", priv2)
+
+fmt.Printf("do they match? %t\n", bytes.Equal(privpub, priv2))
+```
+
+If we try and sign with that:
+
+```go
+data := []byte("test")
+sig := ed25519.Sign(privpub, data)
+ok := ed25519.Verify(privpub[32:], data, sig)
+fmt.Printf("ok? %t\n", ok)
+```
+
+```go
+priv2 := ed25519.PrivateKey(privpub)
+sig := ed25519.Sign(priv2, data)
+ok := ed25519.Verify(privpub[32:], data, sig)
+fmt.Printf("ok? %t\n", ok)
+```
+
+```go
+priv2 := ed25519.PrivateKey(privpub)
+sig := ed25519.Sign(priv2, data)
+ok := ed25519.Verify(priv2.Public().(ed25519.PublicKey), data, sig)
+fmt.Printf("ok? %t\n", ok)
+```
+
+Guess what. He no verify.  
+It shouldn't be this hard.  
+If I use only the edwards lib:  
+
+```go
+priv, err := edwards.GeneratePrivateKey()
+if err != nil {
+  log.Fatal().Msgf("%+v", err)
+}
+privpub := append(priv.Serialize(), priv.PubKey().Serialize()...)
+fmt.Printf("%x\n", privpub)
+
+data := []byte("test")
+sig, err := priv.Sign(data)
+if err != nil {
+    log.Fatal().Msgf("%+v", err)
+}
+ok := sig.Verify(data, priv.PubKey())
+fmt.Printf("ok? %t\n", ok)
+```
+
+That does work. Nice.
+
+So do we just avoid using `crypto/ed25519` altogether?  
+I've tried and tested that with txs sent to my cadano node though.  
+
+```go
+cpriv := cosmos_ed25519.PrivKey{Key: privpub}
+sig, err2 := cpriv.Sign(data)
+if err2 != nil {
+    log.Fatal().Msgf("%+v", err2)
+}
+ok := cpriv.PubKey().VerifySignature(data, sig)
+fmt.Printf("ok? %t\n", ok)
+```
+
+No luck with cosmos either. I think they're all just using crypto/ed25519 under
+the hood.
+
+I think it comes down to the fact that the dcrec/edwards package is just not
+returning points on the right curve. Or maybe on a revised curve? Or an outdated
+curve? Or it's just plain broken. Judging from the panics, invalid comments and
+dodgy return values, that's very within the realms of possibility.
+
+Maybe I'm just having a bad day.
+
+If we do this:
+
+```go
+pub, priv, err := ed25519.GenerateKey(rand.Reader)
+if err != nil {
+    log.Fatal().Msgf("%+v", err)
+}
+data := []byte("for the love of all that's holy please work")
+sig := ed25519.Sign(priv, data)
+ok := ed25519.Verify(pub, data, sig)
+fmt.Printf("do I need to tear my hair out? %t\n", !ok)
+```
+
+> do I need to tear my hair out? false
+
+Everything is right with the world.
+
+If we try the `FromSeed` thing:
+
+```go
+_, priv, err := ed25519.GenerateKey(rand.Reader)
+if err != nil {
+    log.Fatal().Msgf("%+v", err)
+}
+priv2 := ed25519.NewKeyFromSeed(priv[:32])
+fmt.Printf("%x\n", priv)
+fmt.Printf("%x\n", priv2)
+```
+
+```
+455fcf171a63d6f7881b71d4293b320165b0c9f121dad08e1fda6a01f5c609a2e00355052a986de68a8b144d250febe4215517ffbed39752c5f84ee1e800842c
+455fcf171a63d6f7881b71d4293b320165b0c9f121dad08e1fda6a01f5c609a2e00355052a986de68a8b144d250febe4215517ffbed39752c5f84ee1e800842c
+```
+
+Right, so generating a key, and using just the 32 byte private part as the seed
+does in fact, return an identical key.
+
+So that highlights the fact that this:
+
+```go
+priv, err := edwards.GeneratePrivateKey()
+if err != nil {
+    log.Fatal().Msgf("%+v", err)
+}
+
+priv2 := ed25519.NewKeyFromSeed(priv.Serialize())
+
+fmt.Printf("%x %x\n", priv.Serialize(), priv.PubKey().Serialize())
+fmt.Printf("%x %x\n", priv2[:32], priv2[32:])
+```
+
+```
+0a79dd812b2e086d021b0e9be1c2e22a3e80f5f3d2a2cf332d8c38494538cb03 0d2e723a7b9c04a6d5909be1c3864ec8f0da3322c3b1e037cba6c4d9d9c6b2b6
+0a79dd812b2e086d021b0e9be1c2e22a3e80f5f3d2a2cf332d8c38494538cb03 5a5163f92d199cde0235b9114ff62c88d729df9130beb2dcfeb813d01c9afaa9
+```
+
+is well and truly borked. The pubkey is being reconstituted differently in each
+package. Now what? I'm a bit lost.
+
+```go
+package main
+
+import (
+  "crypto/ed25519"
+  "fmt"
+
+  "github.com/decred/dcrd/dcrec/edwards/v2"
+)
+
+func main() {
+  priv, err := edwards.GeneratePrivateKey()
+  if err != nil {
+    panic(err)
+  }
+
+  priv2 := ed25519.NewKeyFromSeed(priv.Serialize())
+
+  fmt.Printf("%x %x\n", priv.Serialize(), priv.PubKey().Serialize())
+  fmt.Printf("%x %x\n", priv2[:32], priv2[32:])
+}
+```
+
+Asked Itz.
+
+Have I got this right? Are we using both libs heavily in different places?
+
+#### 14.03.2025 Friday 4h 10m
+
+In the interest of making progress, I'm going to keep reading the relevant
+sections in an attempt to discern:
+- Is there some part of `dcrec` with which the current eddsa tss code relies on?
+- Is it possible to switch from `dcrec` to the standard `ed25519` package?
+- Is that the right direction?
+
+Cleaning up my branch first.  
+Stashing those naughty fmt logs all over the place.  
+
+```
+find . \
+  -name '*tss*' \
+  -type f \
+  -not -path './proto*' \
+  -not -path './.git*' \
+  -not -path './test*' \
+  -not -path './openapi*'
+````
+
+```
+./bifrost/metrics/tss_keysign_metric.go
+./bifrost/tss/tss_signer.go
+./bifrost/tss/go-tss/cmd/tss/tss_http_test.go
+./bifrost/tss/go-tss/cmd/tss/tss_http.go
+./bifrost/tss/go-tss/cmd/tss/mock_tss_server.go
+./bifrost/tss/go-tss/keygen/ecdsa/tss_keygen.go
+./bifrost/tss/go-tss/keygen/eddsa/tss_keygen.go
+./bifrost/tss/go-tss/keysign/ecdsa/tss_keysign.go
+./bifrost/tss/go-tss/keysign/eddsa/tss_keysign.go
+./bifrost/tss/go-tss/common/tss_helper.go
+./bifrost/tss/go-tss/common/tss_helper_test.go
+./bifrost/tss/go-tss/common/tss.go
+./bifrost/tss/go-tss/common/tss_test.go
+./bifrost/tss/go-tss/conversion/tss_helper.go
+./bifrost/tss/go-tss/tss/tss_4nodes_test.go
+./bifrost/tss/go-tss/tss/tss.go
+./bifrost/pkg/chainclients/bitcoin/tss_signable.go
+./bifrost/pkg/chainclients/dash/tss_signable.go
+./x/mayachain/handler_tss_test.go
+./x/mayachain/types/type_tss.pb.go
+./x/mayachain/types/type_tss.go
+./x/mayachain/types/msg_tss_pool.go
+./x/mayachain/types/msg_tss_sign_fail_test.go
+./x/mayachain/types/type_tss_metric_test.go
+./x/mayachain/types/msg_tss_sign_fail.go
+./x/mayachain/types/type_tss_keysign_fail_test.go
+./x/mayachain/types/msg_tss_keysign_fail.pb.go
+./x/mayachain/types/type_tss_keysign_fail.go
+./x/mayachain/types/msg_tss_pool_test.go
+./x/mayachain/types/msg_tss_pool.pb.go
+./x/mayachain/types/type_tss_test.go
+./x/mayachain/types/type_tss_keysign.pb.go
+./x/mayachain/types/type_tss_metric.pb.go
+./x/mayachain/types/type_tss_metric.go
+./x/mayachain/handler_tss.go
+./x/mayachain/handler_tss_keysign_archive.go
+./x/mayachain/handler_tss_keysign.go
+./x/mayachain/handler_tss_archive.go
+./x/mayachain/keeper/v1/keeper_tss_keysign_fail_test.go
+./x/mayachain/keeper/v1/keeper_tss.go
+./x/mayachain/keeper/v1/keeper_tss_test.go
+./x/mayachain/keeper/v1/keeper_tss_keysign_fail.go
+./x/mayachain/handler_tss_keysign_test.go
+```
+
+Now what does the tss cmd actually do?
+
+```
+go run -tags mocknet ./bifrost/tss/go-tss/cmd/tss
+```
+
+```
+input node secret key:
+2025/03/14 12:26:35 fail to decode private key: illegal base64 data at input byte 8
+exit status 1
+```
+
+```
+mayanode keys --keyring-backend file export mayachain --output json
+```
+
+Generating a new secp key:
+
+```
+NWQxNTk2YTI3NjM1ODlhOWY3ODFlOTE0MGY1ZDRiMWUxZTVlM2VjZTE2YjFkYWE5ZmUxOWFlMTdiZGU2NGY2Ng==
+```
+
+Ohhh right. Those logs are familiar, starts with the bifrost client. Makes sense.  
+Running on a separate port `6668`.  
+
+I'm looking for a test which clearly demonstrates eddsa tss keygen and signing.
+
+The `FourNodeTestSuite` ignores eddsa completely:
+
+```go
+algos := []common.Algo{common.ECDSA}
+```
+
+To stream the test output:
+
+```
+go test -v --tags mocknet ./bifrost/tss/go-tss/tss -check.f=FourNodeTestSuite 2>&1
+```
+
+With ECDSA:
+> ok    gitlab.com/mayachain/mayanode/bifrost/tss/go-tss/tss  107.879s
+
+With EDDSA:
+> ok    gitlab.com/mayachain/mayanode/bifrost/tss/go-tss/tss  103.996s
+
+That's good. My gut says not to trust it. All the keys are secp. I can't see
+it testing a signature.
+
+There are 2 main types of tss server:
+- `type tssServer interface` in `./bifrost/tss/tss_signer.go`
+- `type TssServer struct` in `./bifrost/tss/go-tss/tss/tss.go`
+and some of mock/test ones:
+- `type fakeTssServer struct` in `./bifrost/signer/sign_test.go`
+- `type MockTssServer struct` in `./bifrost/tss/go-tss/cmd/tss/mock_tss_server.go`
+- `type MockTssServer struct` in `./cmd/bifrost/health_test.go`
+
+They all conform to the interface.  
+So that leaves us with `TssServer` being the only one used in production.  
+The constructor func for that is `NewTss` which accepts a single private key.  
+That means we can only sign on a single curve, so are we spinning up another tss
+server for every algo we support then?  
+Doesn't look like it, `GetPriKeyRawBytes` in the `NewTss` constructor explicity
+requires `secp256p1.PrivKey`.  
+How are they supposed to create a valid ed25519 signature when they're not
+allowed ed25519 keys?
+
+Main public repos for eddsa tss:
+github.com/bnb-chain/tss-lib
+
+That was forked by thorchain:
+gitlab.com/thorchain/tss/tss-lib
+
+There's also:
+https://gitlab.com/thorchain/tss/go-tss
+
+which has now been moved into the thorchain/thornode repo
+
+What's the difference?  
+go-tss uses lib-tss behind the scenes.  
+It's the thorchain version not the binance version.  
+Also just as an aside, the binance version used to be under:  
+`github.com/binance-chain/tss-lib`  
+but it's now:  
+`github.com/bnb-chain/tss-lib`  
+
+I'm going back to basics here for a second and just trying to generate a minimal
+tss keygen/sign using the original bnb lib from scratch with ed25519 to get my
+head around all this...
+
+My first major discovery: all these `LocalPreParams` are specific to secp.  
+edwards doesn't have that argument at all.  
+
+Step-debugging `TestE2EConcurrentAndSaveFixtures` in `tss-lib` for the learnings.
+
+There's this in `./eddsa/keygen/local_party_test.go`. I must be losing my mind.
+
+```go
+if i < len(fixtures) {
+  P = NewLocalParty(params, outCh, endCh).(*LocalParty)
+} else {
+  P = NewLocalParty(params, outCh, endCh).(*LocalParty)
+}
+```
+
+That's all my brain can take for one day.
+
+#### 16.03.2025 Sunday 2h
+
+Need to make sure I'm using the later version:  
+`github.com/bnb-chain/tss-lib/v2`
+
+`keygen.NewLocalParty(msg, params, keys[i], outCh, endCh)`
+
+Managed an eddsa keygen, now for signing...
+
+The `msg` argument is `big.Int`. A number.  
+So we can't sign arbitrary bytes?  
+
+You can call `new(big.Int).SetBytes([]byte("example"))` but it attempts to
+interpret the sign bytes which would otherwise determine a signed/unsigned
+integer, there might some random side-effects with using this.
+
+Why not accept `[]byte`?  
+It looks like I have to just try the `big.Int` for now.  
 
 
 
