@@ -16344,5 +16344,3276 @@ integer, there might some random side-effects with using this.
 Why not accept `[]byte`?  
 It looks like I have to just try the `big.Int` for now.  
 
+#### Batch Five
+
+```
+20.03.2025 Thursday  1h
+24.03.2025 Monday    6h
+25.03.2025 Tuesday   6h
+26.03.2025 Wednesday 6h
+27.03.2025 Thursday  6h
+28.03.2025 Friday    3h
+02.04.2025 Wednesday 6h
+04.04.2025 Friday    5h 25m
+06.04.2025 Sunday    6h 50m
+07.04.2025 Monday    6h
+08.04.2025 Tuedsay   6h
+09.04.2025 Wednesday 5h
+17.04.2025 Thursday  7h
+24.04.2025 Thursday  6h
+25.04.2025 Friday    1h
+26.04.2025 Monday    5h
+29.04.2025 Tuesday   6h 30m
+30.04.2025 Wednesday 1h 20m
+05.05.2025 Monday    1h 30m
+06.05.2025 Tuesday   3h
+07.05.2025 Wednesday 3h 25m
+
+Total               98h
+```
+
+#### 20.03.2025 Thursday 1h
+
+Going back through my notes for batch four and pushing.
+
+Important bookmarks:
+- `For verifying if a public key is on a curve...` (self-explanatory)
+- `Time for another recap: Asgard vaults are ` (summary of vaults)
+- `Continuing with gouroboros refactor in cardano-go...` (well known cardano points)
+- `Okay here's my updated plan` (how to avoid and handle rollback)
+- `Why can't we just use gouroboros directly to the node (ntn/ntc)` (why I've made a ada sidecar)
+- `The /height endpoint response will go through this sequence while starting`
+- `it's better for maya/bifrost to share the same env vars.` (why I shared env vars)
+- `next best thing is to implement accessor methods and mark all the pubkey fields as deprecated` (why I deprecated vault.PubKey)
+- `One small improvement I think we can make is to always keep subsequent version "constructor" funcs in the same file`
+- `The msg argument is big.Int. A number.` (worry about signing ints rather than hashes)
+
+#### 24.03.2025 Monday 6h
+
+>   tss-lib go-log@v1.0.5/log.go:180  unrecognised message ignored: Type: binance.tsslib.eddsa.signing.SignRound3Message
+
+This is it. This is what I need to see in a test/example. Clean, as terse as
+possible within reason, demos the full functionality from generating keys, to
+signing arbitrary data, to verifying the signature. With standard library
+example too for interop. Minimal jumping around, pretty much in sequence. No
+static data pulling from fixtures short-circuiting parts of the flow.
+
+```go
+package main
+
+import (
+  "crypto/ed25519"
+  "fmt"
+  "math/big"
+  "sync/atomic"
+
+  "github.com/binance-chain/tss-lib/common"
+  "github.com/binance-chain/tss-lib/eddsa/keygen"
+  "github.com/binance-chain/tss-lib/eddsa/signing"
+  "github.com/binance-chain/tss-lib/test"
+  "github.com/binance-chain/tss-lib/tss"
+  "github.com/decred/dcrd/dcrec/edwards/v2"
+  "github.com/ipfs/go-log"
+)
+
+const (
+  Participants = 5
+  Threshold    = 2
+  Data         = "test"
+)
+
+func main() {
+  if err := log.SetLogLevel("tss-lib", "error"); err != nil {
+    panic(err)
+  }
+
+  ids := tss.GenerateTestPartyIDs(Participants)
+  ctx := tss.NewPeerContext(ids)
+  parties := make([]tss.Party, 0, len(ids))
+
+  errCh := make(chan *tss.Error, len(ids))
+  msgCh := make(chan tss.Message, len(ids))
+
+  updater := test.SharedPartyUpdater
+
+  endKeygenCh := make(chan keygen.LocalPartySaveData, len(ids))
+  endKeygenCount := &atomic.Int32{}
+  keygenResult := make([]keygen.LocalPartySaveData, len(ids))
+
+  for i := 0; i < len(ids); i++ {
+    params := tss.NewParameters(tss.Edwards(), ctx, ids[i], len(ids), Threshold)
+    party := keygen.NewLocalParty(params, msgCh, endKeygenCh).(*keygen.LocalParty)
+    parties = append(parties, party)
+    go func(p *keygen.LocalParty) {
+      if err := p.Start(); err != nil {
+        errCh <- err
+      }
+    }(party)
+  }
+
+keygen:
+  for {
+    select {
+    case msg := <-msgCh:
+      if msg.GetTo() == nil {
+        for _, party := range parties {
+          if party.PartyID().Index == msg.GetFrom().Index {
+            continue
+          }
+          go updater(party, msg, errCh)
+        }
+      } else {
+        if msg.GetTo()[0].Index == msg.GetFrom().Index {
+          return
+        }
+        go updater(parties[msg.GetTo()[0].Index], msg, errCh)
+      }
+
+    case end := <-endKeygenCh:
+      idx, err := end.OriginalIndex()
+      if err != nil {
+        panic(err)
+      }
+      keygenResult[idx] = end
+      if endKeygenCount.Add(1) == int32(Participants) {
+        break keygen
+      }
+
+    case err := <-errCh:
+      panic(err)
+    }
+  }
+
+  endSignCh := make(chan common.SignatureData, Participants)
+  var signResult common.SignatureData
+  endSignCount := &atomic.Int32{}
+
+  for i := 0; i < len(ids); i++ {
+    params := tss.NewParameters(tss.Edwards(), ctx, ids[i], len(ids), Threshold)
+    data := new(big.Int).SetBytes([]byte(Data))
+    party := signing.NewLocalParty(data, params, keygenResult[i], msgCh, endSignCh).(*signing.LocalParty)
+    parties = append(parties, party)
+    go func(p *signing.LocalParty) {
+      if err := p.Start(); err != nil {
+        errCh <- err
+      }
+    }(party)
+  }
+
+sign:
+  for {
+    select {
+    case msg := <-msgCh:
+      if msg.GetTo() == nil {
+        for _, party := range parties {
+          if party.PartyID().Index == msg.GetFrom().Index {
+            continue
+          }
+          go updater(party, msg, errCh)
+        }
+      } else {
+        if msg.GetTo()[0].Index == msg.GetFrom().Index {
+          return
+        }
+        go updater(parties[msg.GetTo()[0].Index], msg, errCh)
+      }
+
+    case end := <-endSignCh:
+      if endSignCount.Add(1) == int32(Participants) {
+        signResult = end
+        break sign
+      }
+
+    case err := <-errCh:
+      panic(err)
+    }
+  }
+
+  pubKey := edwards.PublicKey{
+    Curve: tss.Edwards(),
+    X:     keygenResult[0].EDDSAPub.X(),
+    Y:     keygenResult[0].EDDSAPub.Y(),
+  }
+
+  parsedSig, err := edwards.ParseSignature(signResult.Signature.Signature)
+  if err != nil {
+    panic(err)
+  }
+
+  ok := edwards.Verify(&pubKey, []byte(Data), parsedSig.R, parsedSig.S)
+  ok2 := ed25519.Verify(pubKey.Serialize(), []byte(Data), parsedSig.Serialize())
+
+  fmt.Printf("data:   %x\n", []byte(Data))
+  fmt.Printf("pubKey: %x\n", pubKey.Serialize())
+  fmt.Printf("sig:    %x\n", parsedSig.Serialize())
+  fmt.Printf("ok?     %t\n", ok)
+  fmt.Printf("ok2?    %t\n", ok2)
+}
+```
+
+That was with the thorchain tss-lib repo.
+
+`edwards.ParseSignature(signResult.Signature.Signature)` is a bit strange,
+thankfully easily sourced from tests.
+
+Back to maya now then...
+
+Modifying `tss.TssServer` to handle eddsa keygen/signatures properly.
+
+This worries me:
+
+```go
+func (c *Communication) Start(ecdsaPriKeyBytes []byte) error {
+  err := c.startChannel(ecdsaPriKeyBytes)
+  if err == nil {
+    c.wg.Add(1)
+    go c.ProcessBroadcast()
+  }
+  return err
+}
+```
+
+The p2p communication also looks like it's using the ecdsa (public) key to
+set the node id. So what about eddsa?
+
+We're using the package: `github.com/libp2p/go-libp2p`
+
+Oh right it's from the IPFS. The distributed database?  
+InterPlanetary File System  
+
+> fail to convert the public key to peer ID 
+
+```
+{
+  "level": "error",
+  "module": "tsscommon",
+  "time": "22:24:13",
+  "message": "fail to verify the signature"
+}
+{
+  "level": "error",
+  "module": "tsscommon",
+  "error": "signature verify failed",
+  "time": "22:24:13",
+  "message": "fail to process the received message"
+}
+```
+
+```
+go run ./_cmd/tss_gen_sign/tss_gen_sign.go 2>&1 | subl
+```
+
+```
+{"level":"error","module":"tss","error":"fail to process key sign: error Tss Timeout","time":"22:34:42","message":"failed to generate key, blaming: [{Pubkey:tmayapub1addwnpepqdp7q527scpwnckv6wr47nrjg7846jmx4d70v4k9fp3ykts56dscgvp6vmn BlameData:[] BlameSignature:[]}]"}
+22:34:42 FTL fail to process key sign: error Tss Timeout
+```
+
+The logs are INTENSE.
+
+> the malicious party (party ID:1) try to send incorrect message to me (party ID:2)
+
+Hmm. Even ecdsa keygen isn't working atm.  
+No notable changes from the latest eddsa-rc from 3 days ago on TC.
+
+#### 25.03.2025 Tuesday 6h
+
+TSS step 1: get a simple ecdsa pubkey. That should not be difficult.
+
+```go
+comet_secp256k1 "github.com/cometbft/cometbft/crypto/secp256k1"
+cosmos_secp256k1 "github.com/cosmos/cosmos-sdk/crypto/keys/secp256k1"
+```
+
+> {"level":"error","module":"tsscommon","error":"fail to set bytes to local
+  party: task ecdsa-keygen, party {3,}, round 2, culprits [{1,}]: this h1j was
+  already used by another party","time":"14:00:55","message":"fail to apply the
+  share to tss"}
+
+`h1j`?? huh!?  
+
+We're using exactly the same `gitlab.com/thorchain/tss/tss-lib v0.1.6` ver as TC.  
+The `bifrost/tss/` dirs are almost identical, except maya/thor rename.  
+
+> {"level":"error","module":"communication","time":"14:23:58","message":"we do
+  not have the bootstrap node set, quit the connectivity check"}
+
+I've supplied a bootstrap node address though?
+
+Turns out if you use the same preparams for every member of the tss party, it
+breaks. Something about malicious messages. Makes sense.
+
+Now I've got the secp tss keygen working.
+
+Looks like quite a large secp public key?  
+Apparently 512 bit / 64 byte / 128 hex chars / we good!  
+94e543527e1916bfd569adf4d5e4f3b08f2463373630688b0d6c7a5ed2b1327429ea7774a502e808e673cd1b20c271d6281b35ebba8c4d231e5c1827fc17a30d  
+
+I may have been going a bit off track here. The 4 node test does work when I set
+the algo to eddsa.
+
+I think I was getting confused by the fact that the tss group uses secp keys to
+authorize each other, no need for ed25519 for that part.
+
+Back to cardano txout...
+
+> 4:45PM ERR bifrost/signer/sign.go:676 > fail to broadcast tx to chain
+  error="cbor: 89 bytes of extraneous data starting at index 265"
+  memo=OUT:FC0AB6ED220E872C9C7DC76AED0F48859BC339F9F1DA62D3CCBF361CC4296A1B
+  module=signer service=bifrost
+
+```
+@Sign signed:      84a400d90102818258204e18358a9f27dc798cc604de562aec51da5011830d62c0c147e2f43286ba129e00018282581d604da2c2c52ac86c462a4cd0f3f2ad64931fd323e2c6262e9a291e0f5d1a0010fde582581d60659823d5ff68270c2ab6707ff5546c3f483e4cd4ef87ab517dd486e71a0084ea6a021a0002ae3107582061bb634f8595d811d27d40697c7342c994d17ad1670c84d0073d05b9e1556077a10081825820bb758312c2b31c72c71812bca99cb946812af58cb4a2fb5f301f527c82eca62758400d7650ef76f3e1bf6b4d1b288b1772ca6705c66982dfaaa1254c2932bdf214b63932216e0f53c7f8bf70ca81577cc3ed725297153f8cbbc559edf0d0c435a004f5d90103a100a100a1190539a1646d656d6f8278404f55543a4342453538383342363538433137363236374137414241414341394341434332413730413138394137443230334545464245454530373936433446356442433237
+@Broadcast signed: 84a400d90102818258204e18358a9f27dc798cc604de562aec51da5011830d62c0c147e2f43286ba129e00018282581d604da2c2c52ac86c462a4cd0f3f2ad64931fd323e2c6262e9a291e0f5d1a0010fde582581d60659823d5ff68270c2ab6707ff5546c3f483e4cd4ef87ab517dd486e71a0084ea6a021a0002ae3107582061bb634f8595d811d27d40697c7342c994d17ad1670c84d0073d05b9e1556077a10081825820bb758312c2b31c72c71812bca99cb946812af58cb4a2fb5f301f527c82eca62758400d7650ef76f3e1bf6b4d1b288b1772ca6705c66982dfaaa1254c2932bdf214b63932216e0f53c7f8bf70ca81577cc3ed725297153f8cbbc559edf0d0c435a004f5d90103a100a100a1190539a1646d656d6f8278404f55543a4342453538383342363538433137363236374137414241414341394341434332413730413138394137443230334545464245454530373936433446356442433237
+                   84a400190102818258204e18358a9f27dc798cc604de562aec51da5011830d62c0c147e2f43286ba129e00018282581d604da2c2c52ac86c462a4cd0f3f2ad64931fd323e2c6262e9a291e0f5d1a0010fde582581d60659823d5ff68270c2ab6707ff5546c3f483e4cd4ef87ab517dd486e71a0084ea6a021a0002ae3107582061bb634f8595d811d27d40697c7342c994d17ad1670c84d0073d05b9e1556077a10081825820bb758312c2b31c72c71812bca99cb946812af58cb4a2fb5f301f527c82eca62758400d7650ef76f3e1bf6b4d1b288b1772ca6705c66982dfaaa1254c2932bdf214b63932216e0f53c7f8bf70ca81577cc3ed725297153f8cbbc559edf0d0c435a004f5d90103a100a100a1190539a1646d656d6f8278404f55543a4342453538383342363538433137363236374137414241414341394341434332413730413138394137443230334545464245454530373936433446356442433237
+```
+
+The 4th byte is different. That's to do with the tag.
+
+> 7:55PM ERR bifrost/signer/sign.go:791 > fail to sign and broadcast tx out
+  store item error="Command failed: transaction submit  Error: Error while
+  submitting tx: ShelleyTxValidationError ShelleyBasedEraConway (ApplyTxError
+  (ConwayUtxowFailure (InvalidWitnessesUTXOW [VKey
+  (VerKeyEd25519DSIGN \"19f8f8e44161248977cfb873d13ab48e6e14694daf73924f0f76485ff48cf7fa\")])
+  :| []))\n: node command failed" module=signer service=bifrost
+
+The way I was unmarshalling was causing modifications to the byte array passed
+in. Side effects are no good. My B.
+
+Now we are getting this ed25519 keysign issue.
+
+I think this could be circling differences in priv to pub keygen with the
+edwards / ed25519 packages.
+
+This is the private key that my node is trying to use:  
+`Gfj45EFhJIl3z7hz0Tq0jm4UaU2vc5JPD3ZIX/SM9/o=`
+
+I think essentially my last main hurdle is making sure the priv -> pub
+convertion is working correctly in all places.
+
+```
+- name: mayachain-ed25519
+  type: local
+  address: tmaya1m7vm5wwf8wtcalj49ugc83m3gltatrjcc8pfy5
+  pubkey: '{"@type":"/cosmos.crypto.ed25519.PubKey","key":"Gfj45EFhJIl3z7hz0Tq0jm4UaU2vc5JPD3ZIX/SM9/o="}'
+  mnemonic: ""
+```
+
+How is that address made? I get:
+
+`tmaya    1m7vm5wwf8wtcalj49ugc83m3gltatrjcc8pfy5`
+`tmayapub1zcjduepqdsy2cj06c6qvf40g2rfcz55nzrse6fj6ntxh2wrwxtkhe79lns2s3u63sn`
+
+Even after realigning the bech prefix it's very different.
+
+```
+inbound shows:  addr_test1vrrhhk7qq60ha8p8el7ahxj0aahqyyk6j6cyghl0dtl82kg8vtelu  
+priv hex shows: 00429e39c5ac66b8f9ac7509e228ce04e61b9ba88d6db878321c775190959ac5
+```
+
+#### 26.03.2025 Wednesday 6h
+
+It's not possible to convert from decred ed25519 private keys generated with:  
+`decred_edwards_v2.GeneratePrivateKey()` to the official library.
+
+That's because the official library stores the random 32 byte seed needed to
+reconstitute the curve points, whereas the decred library drops it.
+
+Here's how a ed25519 key is structured:
+
+```go
+seed := make([]byte, 32)
+_, _ = io.ReadFull(rand.Reader, seed)
+h := sha512.Sum512(seed)
+s, _ := edwards25519.NewScalar().SetBytesWithClamping(h[:32])
+publicPoint := (&edwards25519.Point{}).ScalarBaseMult(s)
+fmt.Printf("manual:    %x %x\n", seed, publicPoint.Bytes())
+
+official := crypto_ed25519.NewKeyFromSeed(seed)
+decred, _ := decred_edwards_v2.PrivKeyFromSecret(seed)
+
+fmt.Printf("official:  %x %x\n", official[:32], official[32:])
+fmt.Printf("decred:    %x %x\n", decred.SerializeSecret()[:32], decred.PubKey().Serialize())
+```
+
+Using the above code, we maually create a random seed, hash it, calculate the
+scalar, then generate the public key point.
+
+As shown above, we can pass the seed to both libraries and they will generate
+the same keypair.
+
+The official library format is: `<32 byte seed><32 byte pubkey>`.
+
+The decred key is a struct, but the accessor `SerializeSecret()` returns the
+same format as above. There's a massive caveat. The secret is not populated
+when using `PrivKeyFromScalar` or `GeneratePrivateKey`. Only when using
+`PrivKeyFromBytes` or `PrivKeyFromSecret`.
+
+If we use the decred library `GeneratePrivateKey` (following snippet shows what
+that actually does):
+
+```go
+func GeneratePrivateKey() (*PrivateKey, error) {
+  key, err := ecdsa.GenerateKey(Edwards(), rand.Reader)
+  if err != nil {
+    return nil, err
+  }
+
+  pk := new(PrivateKey)
+  pk.ecPk = key
+
+  return pk, nil
+}
+```
+
+The key is set to an unexported property `ecPk`.  
+
+While this struct does have the secret as a property:
+
+```go
+type PrivateKey struct {
+  ecPk   *ecdsa.PrivateKey
+  secret *[32]byte
+}
+```
+
+It's not set during the `ecdsa.GenerateKey` func.
+
+So even if we used the unsafe package in an attempt to read this field directly
+from memory, it would be zeroed.
+
+For this reason, if we want to be able to use decred keys with the official
+library which uses the seed, we can either:
+- generate a seed and pass that through to both official/decred
+- use the official library and pass the seed to decred
+
+Another concern is that decred doesn't play nicely with keys generated with the
+official library:
+
+```go
+_, official, _ := crypto_ed25519.GenerateKey(rand.Reader)
+decred, _ := decred_edwards_v2.PrivKeyFromSecret(official.Seed())
+_, _, err := decred_edwards_v2.PrivKeyFromScalar(decred.Serialize())
+```
+
+> FTL not on subgroup (>N)
+
+We get that error, even though it will generate signatures identical to the
+official package with the above keys. So we need to be careful to avoid the
+`PrivKeyFromScalar` func.
+
+Just to confirm, it doesn't mind the keys it generates itself:
+
+```go
+decred, _ := decred_edwards_v2.GeneratePrivateKey()
+_, _, err := decred_edwards_v2.PrivKeyFromScalar(decred.Serialize())
+checkErr(err)
+```
+
+but again, we can't use those because the seed bytes are lost.
+
+This leads me back to the `BASEChain-ED25519` file.  
+What are we storing?  
+The scalar?  
+Yep, here is the snippet in `ed25519_keys.go`:
+
+```go
+// now we test the ed25519 key can sign and verify
+var pk *edwards.PublicKey
+_, pk, err = edwards.PrivKeyFromScalar(edwards.Edwards(), item.Data)
+if err != nil {
+  return fmt.Errorf("fail to parse private key")
+}
+```
+
+Because we're using `edwards.PrivKeyFromScalar` in the `mnemonicToEddKey` func,
+none of the values produced will result in a seed we can use for interop with
+the official lib.
+
+So do we always generate and reuse keys like this:
+
+```go
+privKey, err := edwards.GeneratePrivateKey()
+checkErr(err)
+
+privKey2, _, err := edwards.PrivKeyFromScalar(privKey.Serialize())
+checkErr(err)
+
+fmt.Printf("privKey:  %x\n", privKey.Serialize())
+fmt.Printf("privKey2: %x\n", privKey2.Serialize())
+
+d := []byte("data")
+
+sig1, err := privKey.Sign(d)
+checkErr(err)
+
+sig2, err := privKey2.Sign(d)
+checkErr(err)
+
+fmt.Printf("sig1: %x\n", sig1.Serialize())
+fmt.Printf("sig2: %x\n", sig2.Serialize())
+```
+
+That will work for signing. My worry is that if we use the "scalar bytes" where
+we'd normally use the "seed" or "private bytes", it would break when we try to
+use it with other libraries.
+
+`cosmos/.../ed25519.PrivKey.Key` is a `crypto/ed25519.PrivKey`
+
+So if we used the decred edwards package we wouldn't be making valid cosmos keys
+because we're not making valid underlying crypto/ed25519 keys, right?
+
+Why not just put in a pull request with decred to save the secret during key
+generation?  
+
+Because it calls the standard library `crypto/ecdsa.GenerateKey` func which is
+dropping the seed. You can't just pass a predefined seed into that either
+because it 50% of the time drops the first byte.
+
+Oh sweet jesus where am I? What day is it? How did I get here??
+
+I don't think we should be using `crypto/ecdsa`. `crypto/ed25519` has all the
+things you need to get points/scalars and all that crap on the edwards curve.
+
+🤔
+
+Decision time. I'm going to just generate a new key using `crypto/ed25519`,
+ignore the old one at `./BASEChain-ED25519`, replace references in the code to
+the old one with the new one, reconsitute keys for `decred/.../edwards` when
+necessary using `PrivKeyFromSecret` for interop with
+cosmos/comet/tender/official, and only use `PrivKeyFromScalar` for tss signing
+(as the tss code seems to heavily rely on the decred edwards package)
+
+I think that checks all the boxes.
+
+All except one. Getting a consistent mnemonic -> ed25519 key.
+
+For that, we can still use the scalar, but pass that to the standard lib as if
+it was the seed. Might seem a little confusing, but it will be consistent.
+
+Actually why even bother deriving using the "path" why not derive directly from
+the mnemonic to get the master key/seed?
+
+```go
+seed, _ := bip39.NewSeedWithErrorChecking(mnemonic, Password)
+```
+
+I don't think we have HD wallets? I even remember seeing that explicity NOT the
+case for cosmos ed25519.
+
+Continue tomorrow from keyring2 where we simply go from mnemonic -> ed25519
+and check the output of `mayanode keys list`
+
+#### 27.03.2025 Thursday 6h
+
+First thing is to update the `mayanode ed25519` command to generate a proper
+key and store it in the standard keychain.
+
+`./cmd/mayanode/cmd/ed25519_keys.go`
+
+```bash
+mnemonic=$(mayanode keys mnemonic)
+echo "mayachain\npassword_\n$mnemonic" | mayanode ed25519
+mayanode ed25519
+```
+
+I commited changes to that command.
+
+Quick check to see if the data matches what I expect:
+
+`mayanode keys list --keyring-backend file`
+
+It happened.
+
+```
+waiting for cardano address2 (addr_test1vzkwmf5m2s55r0u9fvxvufe58ecsvy485f7z7vla5kylfaqtaud3c) to show balance...
+balance detected!
+---
+[
+  {
+    "txHash": "edc0dc682513adc2d163628f8f33a9d3332e90c73d1b42214449547f6cad2bd0",
+    "address": "addr_test1vzkwmf5m2s55r0u9fvxvufe58ecsvy485f7z7vla5kylfaqtaud3c",
+    "amount": 1113573,
+    "index": 0,
+    "height": 233
+  }
+]
+---
+```
+
+I could cry tears of joy.  
+We have witnessed a swap from dash to ada.  
+It's more than a month behind, but it finally happened.  
+
+Add ada to pool transaction:
+
+```
+[
+  {0: 258([[h'AEAE26233D7513D6EE1EC76794E7C089A5917D4751AD600DE51A1FE2FFC785EE', 0]]), 1: [[h'6079567E3076097D0777BD2FF4A013386F2C032955C99B8E2591108496', 10000000], [h'60B1040761141C759896F2EC626BE327927AD2F253E861F02EF37B4CCB', 899988803120]], 2: 175093, 7: h'337D590A2E13FE1377E09BCC613C1D138C784ABA7AC5955D781F571605B8A74A'},
+  {0: 258([[h'1328D855F07AB923A79A87963CB167752861F643C59DA14787B7BA09BC90DEB4', h'60FEF5CFE7BF169F662F74290FFE234F6661B07702C93D6BE72042273D2426387146050A95781F28501CEF9AAEBEFC2D8B615002F73A3EAF45CC6F00A0B9AA06']])},
+  true,
+  259({0: {0: {1337: {"memo": ["add:ada.ada:tmaya1wep80ynx5m4n26h4uvj9yrlvlc0q6jjcsmdudu"]}}}})
+]
+```
+
+```
+348 bytes
+56 char memo / 112 bytes?
+348 - 56 = 292
+348 - 112 = 236
+
+273 with null aux struct
+```
+
+---
+
+Swap ada to dash tx:
+
+```
+[
+  {
+    0: 258([[h'F17E65E11D71193E0EB14EADA4AE43D69C3EBA0DD2E589657F7C30A6835242C6', 1]]),
+    1: [[h'60D25815DF393CA1DC89EB177FEBD373F70C6D423958056B98BA05084C', 10000000], [h'6038CD5B11977BF37DE8845D24F86B5D42AB15C340BB4802991B08D60E', 899978628335]],
+    2: 174785,
+    7: h'861424E0250B340706179B4AC72E832AD3BFD87B1CE9CAD3C523DE510C49F3A5'
+  },
+  {
+    0: 258(
+      [
+        [
+          h'11D4D37965F5AF98FB8F7EA77F95E5707715BA325B1BE5EC97F8C1D6A24F8E61',
+          h'0DE021043EE48A0A4CEBFB5808D2147D39DE745D7DCFD2106E9CFA3DD943675E2B8E1F367527E79ED8142E1290CBCDC92DF88339995C141FAE8EA6C60D7B2505'
+        ]
+      ]
+    )
+  },
+  true,
+  259({0: {0: {1337: {"memo": ["swap:dash.dash:ySjEKxHrdRDhLF72vVJfRUhNYR2AZzC1wq"]}}}})
+]
+```
+
+```
+341 bytes
+49 chars / 98 bytes
+292
+243
+
+273 null aux
+```
+
+---
+
+Swap dash to ada out tx:
+
+```
+[
+  {
+    0: 258([[h'78314E6E1361CC1A736CD5311ED579D9100D4958BA0BC1B76F2C19FB7B0B7C89', 0]]),
+    1: [[h'60E590466E9AD3202B3E38F3B6CF6FDED67D031363C176743F89C84E1C', 4201902], [h'60D25815DF393CA1DC89EB177FEBD373F70C6D423958056B98BA05084C', 5622433]],
+    2: 175665,
+    7: h'3185E7F2A993F0EF880F340847713B9D4AFE39B6BA95757700CB61E46AF94329'
+  },
+  {
+    0: [
+      [
+        h'81D2C1A1A2D97EA504C508B96386C3653084ED0B45467A41D4A2194575F8D4BA',
+        h'490274BC0E566484E130DF4876552F8818265FACF2CF2A1170D8A3131EA81124509BFF876340422F231638E53291EACAB254249B313392B157061BB4C085F206'
+      ]
+    ]
+  },
+  true,
+  259({0: {0: {1337: {"memo": ["OUT:B7496CD5CD68BF68DE57A0F65B7A8E70126062BEDC26DC93ED5EC25605EF", "9E52"]}}}})
+]
+```
+
+```
+354 bytes
+68
+286
+
+266 with null aux
+```
+
+---
+
+Oh, what's this about:
+
+```
+INF ../go/src/gitlab.com/mayachain/mayanode/x/mayachain/handler_common_outbound.go:180
+> slash node account, no matched tx out item inbound
+txid=B7496CD5CD68BF68DE57A0F65B7A8E70126062BEDC26DC93ED5EC25605EF9E52 outbound
+tx=
+{
+  "chain": "ADA",
+  "coins": [
+    {
+      "amount": "4201902",
+      "asset": "ADA.ADA"
+    }
+  ],
+  "from_address": "addr_test1vrf9s9wl8y72rhyfavthl67nw0mscm2z89vq26uchgzssnqu9v2nz",
+  "gas": [
+    {
+      "amount": "175665",
+      "asset": "ADA.ADA"
+    }
+  ],
+  "id": "0669265582D805761FBB7EAD23941FC15C7E3920870BD19C6649F8E385A29589",
+  "memo": "OUT:B7496CD5CD68BF68DE57A0F65B7A8E70126062BEDC26DC93ED5EC25605EF9E52",
+  "to_address": "addr_test1vrjeq3nwntfjq2e78remdnm0mmt86qcnv0qhvapl38yyu8qz57hh8"
+}
+```
+
+> validator's bond is zero, can't be slashed
+
+Too broke to be charged 😎
+
+CommonOutboundTxHandler  
+OutboundTxHandler  
+MsgHandler  
+
+> vault has more asset than wallet
+
+```
+handler_observed_txin.go:175 >    handleMsgObservedTxIn request Tx:="B7496CD5CD68BF68DE57A0F65B7A8E70126062BEDC26DC93ED5EC25605EF9E52: yX6kD415WGpwwDkb1AEgJettjj775KSSUZ ==> yTu1AFNxoxQ6pGouYCZbsjwLDCQmF8Tjaj (Memo: swap:ada.ada:addr_test1vrjeq3nwntfjq2e78remdnm0mmt86qcnv0qhvapl38yyu8qz57hh8) 10000000000 DASH.DASH (gas: [1000000 DASH.DASH])"
+handler_swap.go:263 >             receive MsgSwap request tx hash=B7496CD5CD68BF68DE57A0F65B7A8E70126062BEDC26DC93ED5EC25605EF9E52 signer=tmaya12vseg3nesagld4tr99k6k4vu0s9g6jzk5rt9yt source asset=DASH.DASH target asset=ADA.ADA
+swap_current.go:176 >             swapping coins={"amount":"10000000000","asset":"DASH.DASH"} from=yX6kD415WGpwwDkb1AEgJettjj775KSSUZ target=MAYA.CACAO to=addr_test1vrjeq3nwntfjq2e78remdnm0mmt86qcnv0qhvapl38yyu8qz57hh8
+swap_current.go:274 >             pre swap asset=8400001804 cacao=1209999706 lp units=1000000000 pool=DASH.DASH synth units=0
+swap_current.go:336 >             post swap asset=18400001804 cacao=909787108 emit asset=300212598 lp units=1000000000 pool=DASH.DASH synth units=0
+swap_current.go:176 >             swapping coins={"amount":"300212598","asset":"MAYA.CACAO"} from=yX6kD415WGpwwDkb1AEgJettjj775KSSUZ target=ADA.ADA to=addr_test1vrjeq3nwntfjq2e78remdnm0mmt86qcnv0qhvapl38yyu8qz57hh8
+swap_current.go:274 >             pre swap asset=20000000 cacao=500000000 lp units=1000000000 pool=ADA.ADA synth units=0
+swap_current.go:336 >             post swap asset=15311671 cacao=800212598 emit asset=4688329 lp units=1000000000 pool=ADA.ADA synth units=0
+handler_solvency.go:232 >         vault has more asset than wallet, insolvent asset=ADA.ADA gap=10000000 vault amount=20000000 wallet amount=10000000
+handler_solvency.go:185 >         chain is insolvent, halt until it is resolved chain=ADA
+handler_observed_txout.go:176 >   handleMsgObservedTxOut request Tx:="0669265582D805761FBB7EAD23941FC15C7E3920870BD19C6649F8E385A29589: addr_test1vrf9s9wl8y72rhyfavthl67nw0mscm2z89vq26uchgzssnqu9v2nz ==> addr_test1vrjeq3nwntfjq2e78remdnm0mmt86qcnv0qhvapl38yyu8qz57hh8 (Memo: OUT:B7496CD5CD68BF68DE57A0F65B7A8E70126062BEDC26DC93ED5EC25605EF9E52) 4201902 ADA.ADA (gas: [175665 ADA.ADA])"
+handler_outbound_tx.go:52 >       receive MsgOutboundTx request outbound tx hash=0669265582D805761FBB7EAD23941FC15C7E3920870BD19C6649F8E385A29589
+handler_common_outbound.go:180 >  slash node account, no matched tx out item inbound txid=B7496CD5CD68BF68DE57A0F65B7A8E70126062BEDC26DC93ED5EC25605EF9E52 outbound tx={"chain":"ADA","coins":[{"amount":"4201902","asset":"ADA.ADA"}],"from_address":"addr_test1vrf9s9wl8y72rhyfavthl67nw0mscm2z89vq26uchgzssnqu9v2nz","gas":[{"amount":"175665","asset":"ADA.ADA"}],"id":"0669265582D805761FBB7EAD23941FC15C7E3920870BD19C6649F8E385A29589","memo":"OUT:B7496CD5CD68BF68DE57A0F65B7A8E70126062BEDC26DC93ED5EC25605EF9E52","to_address":"addr_test1vrjeq3nwntfjq2e78remdnm0mmt86qcnv0qhvapl38yyu8qz57hh8"}
+```
+
+Don't really understand those logs, the inbound txid is literally just a few
+lines up in the log so it clearly knows about it, why can't it match it?
+
+Ah got it, we have:  
+```
+tx.ObservedPubKey.Equals(txOutItem.VaultPubKey)
+```
+but we also need:  
+```
+tx.ObservedPubKeyEddsa.Equals(txOutItem.VaultPubKey)
+```
+
+Fixed. Back to smokes?
+
+```
+git checkout adc-smoke-adaonly
+git merge add-cardano-chain
+```
+
+That was a lot more that I expected. Now... how the hell do you smoke again...
+
+> 0.610 go: go.mod requires go >= 1.22.11 (running go 1.22.1; GOTOOLCHAIN=local)
+
+If we keep pinning these
+`@sha256:0ff9c939773306b8afc7d3b9393e1774765ceb7b7f09754bbd042834126e1679`
+hashes in the docker build files, we'll prevent developers from using their own
+versions unless they modify the code. It's an additional barrier for
+contributors. Is that reasonable? Or is that security gone mental? It's not
+like anyone can spoof registry.gitlab.com/mayachain without seriously
+compromising the target machine's certificate chain anyway.
+
+I'm deleting them.
+
+Ohh is it because we want to ensure the user is pulling the latest image?  
+There's a `docker compose pull` command for that?  
+
+>  => => # /usr/bin/ld: cannot find -lradix_engine_toolkit_uniffi: No such file or directory
+
+I just switched over to using my docker build which does away with `builder-vX`
+and `runner-base-vX` and just uses a multi-stage build. It also pulls the radix
+linked library according to the cpu architecture so it works on my arm m1 mac.
+It's a bit of an unnecessary update for this MR/PR though.
+
+Python requirements issue:
+
+```
+14.65     terra-sdk 2.0.4 depends on mnemonic<0.20 and >=0.19
+14.65     pycardano 0.12.0 depends on mnemonic<0.22 and >=0.21
+```
+
+Not even sure if I need `pycardano` but I'll try `0.11.0`
+
+```
+docker run --rm -it --entrypoint bash -v $(pwd)/test/smoke:/mnt -w /mnt python:3.10-slim
+
+apt update && apt install -y libsecp256k1-dev build-essential git
+
+pip install python-bitcointx
+pip install -e python-dashtx
+pip install -r requirements.txt
+
+pip install pycardano
+```
+
+```
+ERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+web3 5.9.0 requires websockets<9.0.0,>=8.1.0, but you have websockets 13.1 which is incompatible.
+terra-sdk 2.0.4 requires mnemonic<0.20,>=0.19, but you have mnemonic 0.21 which is incompatible.
+```
+
+That sucks.
+
+```
+pip install pip-tools
+cp requirements.txt requirements.in
+echo 'pycardano==0.13.0' >> requirements.in
+pip-compile requirements.in
+```
+
+> ERROR: Cannot install -r requirements.in (line 23) because these package versions have conflicting dependencies.
+
+Yeh... I know...
+
+- 0.12.0 NOPE
+- 0.11.0 NOPE
+- 0.10.0 NOPE
+- 0.9.0 NOPE
+- ...
+- 0.1.0 OK
+
+😅
+
+Sim tests can't come soon enough.
+
+I guess I'll just try `0.1.0`, or do everything by hand in a language I rarely
+use. It's at this point I'm very thankful for LLMs.
+
+```
+Traceback (most recent call last):
+  File "/app/test/smoke/scripts/smoke.py", line 10, in <module>
+    from utils.segwit_addr import decode_address
+ModuleNotFoundError: No module named 'utils'
+```
+
+> fail to get address for chain: no public key for chain 'ADA': no public key for signing algorithm 'ed25519'
+
+Now that!... is a good error.
+
+Something to do with the build/genesis bash scripts?
+
+> Error: error validating genesis file /root/.mayanode/config/genesis.json:
+  tmayapub1zcjdueq56tpped8t436gdxal74q5yzc85t2s2e6zthp55y is not bech32 encoded
+  pub key,err : unmarshal to types.PubKey failed after 25 bytes (invalid pubkey
+  size: invalid pubkey
+  [cosmos/cosmos-sdk@v0.45.9/crypto/keys/ed25519/ed25519.go:212]):
+  1624DE6414D2C21CB4EBAC74869BBFF541420B07A2D5056742
+
+#### 28.03.2025 Friday 3h
+
+Smoking
+
+> 'MockCardano' object has no attribute 'default_gas'
+
+There's a 258 tag around the witness that my txout is not using. The tx is still
+accepted, just need to consider that will effect the tx size estimation and
+therefore the fee.
+
+https://cexplorer.io/article/understanding-cardano-fees
+
+The documentation is slightly wrong. A and B are the wrong way round.  
+A is a small per byte additional fee.  
+B is a static per tx min fee.  
+
+This is coming directly from the shelley genesis file on mainnet:
+
+```
+"minFeeA": 44,
+"minFeeB": 155381,
+```
+
+It's not obvious from the config but these values are equivalent:
+
+```
+config  | node rpc     | smoke    | default
+---     | ---          | ---      | ---
+minFeeA | txFeePerByte | tx_rate  | 44
+minFeeB | txFeeFixed   | tx_fixed | 155381
+```
+
+Whats `utxoCostPerByte`?  
+Docs say the max fee is `2.17` ADA.  
+fee vs gas?  
+I think the fee is the cacao fee and the gas is the target chain fee/gas currency.  
+
+```
+"fees": {
+  "coinsPerUtxoByte": 4310,
+  "maxTxSize": 16384,
+  "minFeeCoefficient": 44,
+  "minFeeConstant": 155381,
+  "minUtxoThreshold": 849070
+}
+```
+
+For the memo...
+
+```
+cbor          hex       bytes
+[""]          8160      2
+["a"]         816161    3
+["", ""]      826060    3
+["", "", ""]  83606060  4
+```
+
+We split the memo into 64 length strings.
+
+When a cbor string goes from under 23 to 24+, it switches to a different integer
+type that takes another byte. I've accounted for that in `shouldDropByte` below.
+
+```js
+cat <<EOF | node
+
+const calcMemoBytes = (memo) => {
+  let segments = Math.ceil(memo.length / 64)
+  let shouldDropByte = (memo.length % 64) < 24
+  let bytes = memo.length + 1 + (segments * 2) + (shouldDropByte ? -1 : 0)
+  console.log('length ', memo.length)
+  console.log('segments ', segments)
+  console.log('shouldDropByte ', shouldDropByte)
+  console.log('memo cbor will be ', bytes, ' bytes in length')
+  return bytes
+}
+
+calcMemoBytes("123456789012345678901234")
+// returns: 27
+
+calcMemoBytes("hi.there.this.is.quite.a.long.memo.that.would.have.to.be.split.into.an.array.because.it.exceeds.the.string.length.limit")
+// returns: 124
+EOF
+```
+
+```
+["testmemounder64charslong"]
+817818746573746D656D6F756E646572363463686172736C6F6E67
+27 bytes
+
+["hi.there.this.is.quite.a.long.memo.that.would.have.to.be.split.i", "nto.an.array.because.it.exceeds.the.string.length.limit"]
+82784068692E74686572652E746869732E69732E71756974652E612E6C6F6E672E6D656D6F2E746861742E776F756C642E686176652E746F2E62652E73706C69742E6978376E746F2E616E2E61727261792E626563617573652E69742E657863656564732E7468652E737472696E672E6C656E6774682E6C696D6974
+124 bytes
+```
+
+Okay we have that if we need.  
+
+Base txs are:
+- 273 bytes with null aux struct
+- 266 without witness cbor tag
+
+Is `sendNetworkFee` supposed to report the average tx fee?
+
+What's the format of an unspent?
+
+We need a `get_address_from_pubkey` in python.
+
+I'm tempted to just do a `tools/pubkey_to_address` endpoint so I don't have to
+code in python *coughs* I mean to get this wrapped up more quickly.
+
+Continue with python impl and smokes...
+
+#### 02.04.2025 Wednesday 6h
+
+> TypeError: Object of type bytes is not JSON serializable
+> File "/usr/local/lib/python3.10/site-packages/requests/models.py", line 466, in prepare_body
+
+Added `CARDANO_RPC_LOG_LEVEL` env var.
+
+> expected a 32 length ed25519 public key, got 33 bytes
+
+This is the hex the smoke test is trying to convert:  
+`021160f7ca28182593bd80e7b95e83f37b0e907f2fe35efd1273d361b12ea0c197`  
+
+Oh this is going to be great fun. Going to have to add eddsa keys to the python
+smoke tests because of course that key is not eddsa.
+
+Or maybe just skip straight to sim tests?
+
+I'll try that quickly...
+
+Oh updating core/genesis build scripts for new mayanode ed25519 command.
+
+Merging from branch `simulation-tests` on mayanode commit:  
+`77481c0e98bbe997cc0c1a4c3756e3960cc80bb4`  
+
+12 days ago, should be a lot more there according to aaluxx...
+
+Issue out the gate. Go version contstraints. I have a problem with the use of
+pinned docker images and not using multi step builds here. Also have the problem
+of not having the radix library for my cpu architecture again.
+
+```
+go get github.com/alexdcox/cardano-go
+```
+
+```
+docker build \
+  -f ./ci/Dockerfile.simtest \
+  -t thornode-simtest \
+  .
+
+docker run \
+  --rm \
+  -it \
+  -e PARALLELISM \
+  --network host \
+  -w /app \
+  thornode-simtest \
+    sh -c 'make _test-simulation'
+
+docker run --rm -it thornode-simtest bash
+cd test/simulation && /simtest/simtest
+```
+
+> /simtest/simtest: error while loading shared libraries:
+   libradix_engine_toolkit_uniffi.so: cannot open shared object file: No such
+   file or directory
+
+It's at:  
+`/app/lib/libradix_engine_toolkit_uniffi.so`
+
+Replaced the annoying `make _built-test-simulation` with just the upfront
+`go install ...`
+
+```
+bifrost/pkg/chainclients/radix/radix.go:101:36: cannot use tssServer (variable of type *"gitlab.com/thorchain/tss/go-tss/tss".TssServer) as "gitlab.com/mayachain/mayanode/bifrost/tss".tssServer value in argument to tss.NewKeySign: *"gitlab.com/thorchain/tss/go-tss/tss".TssServer does not implement "gitlab.com/mayachain/mayanode/bifrost/tss".tssServer (wrong type for method KeySign)
+32.38     have KeySign("gitlab.com/thorchain/tss/go-tss/keysign".Request) ("gitlab.com/thorchain/tss/go-tss/keysign".Response, error)
+32.38     want KeySign("gitlab.com/mayachain/mayanode/bifrost/tss/go-tss/keysign".Request) ("gitlab.com/mayachain/mayanode/bifrost/tss/go-tss/keysign".Response, error)
+32.78 # gitlab.com/mayachain/mayanode/bifrost/pkg/chainclients/evm
+32.78 bifrost/pkg/chainclients/evm/client.go:34:2: tssp redeclared in this block
+32.78   bifrost/pkg/chainclients/evm/client.go:23:2: other declaration of tssp
+32.78 bifrost/pkg/chainclients/evm/client.go:34:2: "gitlab.com/mayachain/mayanode/bifrost/tss/go-tss/tss" imported as tssp and not used
+32.78 bifrost/pkg/chainclients/evm/client.go:93:31: cannot use server (variable of type *"gitlab.com/thorchain/tss/go-tss/tss".TssServer) as "gitlab.com/mayachain/mayanode/bifrost/tss".tssServer value in argument to tss.NewKeySign: *"gitlab.com/thorchain/tss/go-tss/tss".TssServer does not implement "gitlab.com/mayachain/mayanode/bifrost/tss".tssServer (wrong type for method KeySign)
+32.78     have KeySign("gitlab.com/thorchain/tss/go-tss/keysign".Request) ("gitlab.com/thorchain/tss/go-tss/keysign".Response, error)
+32.78     want KeySign("gitlab.com/mayachain/mayanode/bifrost/tss/go-tss/keysign
+```
+
+Right this is starting to look like a rabbit hole. Switching back to `adc-smoke-adaonly`
+
+`tmayapub1zcjduepqc735c594l9sz9wql57rauf3c376gffmvugkdu3ylu28kdvp83j4quwynuv`
+
+Committed: `Add '/tools/pubkey-to-address' endpoint, allow CARDANO_RPC_LOG_LEVEL env var, fix WithCborTag.UnmarshalCBOR`  
+Discarded: `Add '/tools/bech-to-hex' endpoint`  
+
+```
+cd test/smoke
+python -m scripts.smoke --fast-fail=True
+```
+
+Not sure I can do the same thing with secp as ed25519:
+
+```python
+pubkey_eddsa = self.mayachain_client.get_vault_pubkey_eddsa()
+raw_pubkey_eddsa = decode_address(pubkey_eddsa)[5:]
+```
+
+Oh nice that does work.
+
+> Cannot transfer. No ADA UTXO available for addr_test1vrejz6eyzpwnk5k33adtzdwuahehag4eerg9u7jdj66hjcqzwpg7z
+
+That address is coming from `aliases_ada` in `aliases.py`.
+
+Updating my mocknet/privnet script to immediately send funds to the master
+address for the smoke tests.
+
+> No signing key provided
+
+Adding a `/tx/sign` endpoint to make the python code and scripts cleaner.
+
+Mustn't forget to convert from private key hex to private key cbor (hex) with
+the extra preceeding 2 byte cbor encoding when using the cli.
+
+> Command failed: transaction sign  Error: Error reading signing key: /dev/fd/4: Invalid key.
+
+> E[2025-04-03 07:16:27,242] {"details":"Command failed: transaction submit
+  Error: Error while submitting tx: ShelleyTxValidationError
+  ShelleyBasedEraConway (ApplyTxError (ConwayUtxowFailure (UtxoFailure
+  (ValueNotConservedUTxO (MaryValue (Coin 0) (MultiAsset (fromList [])))
+  (MaryValue (Coin 700000000000) (MultiAsset (fromList []))))) :|
+  [ConwayUtxowFailure (UtxoFailure (BadInputsUTxO (fromList [TxIn (TxId
+  {unTxId =
+  SafeHash \"f094dc6924e7d02c2c3d012b3b65cbeadde52b5d0a7f89b13b577ea9aed9fa84\"})
+  (TxIx {unTxIx = 0})])))]))\n","error":"node command failed"}
+
+MASTER account will have `700000000000` ADA.
+
+```
+TX BUILD
+{
+  "txIn": [
+    {
+      "txHash": "f094dc6924e7d02c2c3d012b3b65cbeadde52b5d0a7f89b13b577ea9aed9fa84",
+      "index": 0
+    }
+  ],
+  "txOut": [
+    {
+      "address": "addr_test1vq07qc6nexr9uetwenuuqna8nq6ukftmyljntnn3zw5x69geav0we",
+      "value": 40000000000
+    }
+  ],
+  "changeAddress": "addr_test1vrejz6eyzpwnk5k33adtzdwuahehag4eerg9u7jdj66hjcqzwpg7z",
+  "memo": "SEED"
+}
+```
+
+```
+{
+    "hash": "f094dc6924e7d02c2c3d012b3b65cbeadde52b5d0a7f89b13b577ea9aed9fa84",
+    "inputs": [
+        {
+            "hash": "8c78893911a35d7c52104c98e8497a14d7295b4d9bf7811fc1d4e9f449884284",
+            "index": 0
+        }
+    ],
+    "outputs": [
+        {
+            "amount": 700000000000,
+            "address": "addr_test1vrejz6eyzpwnk5k33adtzdwuahehag4eerg9u7jdj66hjcqzwpg7z"
+        },
+        {
+            "amount": 199999829571,
+            "address": "addr_test1vztc80na8320zymhjekl40yjsnxkcvhu58x59mc2fuwvgkc332vxv"
+        }
+    ],
+    "fee": 170429
+}
+```
+
+Was just a case of building the second tx too fast, so we were using utxos that
+have already been spent.
+
+> #!# --> gas set, using that value
+> #!# --> [<Coin 20.00000000 MAYA.CACAO>]
+> #!# @sim_catch_up
+> #!# @sim_trigger_tx
+> E[2025-04-03 07:40:09,269] 'MockCardano' object has no attribute 'estimated_txn_fee'
+
+Okay so I'm returning the actual gas fee, but maybe I lie like the other tests?
+
+```
+84a400d90102818258200f11ae8b7f67519061cb6a6858a72bbc41d5982e639e8870bc654e0a97e6e2b401018282581d60e04de2f190f78ec3e6e2a3741e4deddd472083b67b36da9a4118a9de1aee6b280082581d60f3216b24105d3b52d18f5ab135dcedf37ea2b9c8d05e7a4d96b579601b00000096dfc4c3ec021a0002a2d9075820f903ad11046b4c65dadd5eef70d659c7dfaba9fab1cad1de4810e5bee6b85d75a100d9010281825820bca2c6f573270fba58116fa51263d8c00c0ba92f1c44abe2d107e1814fc650fb58406b1bde129e173734915a8cfe144c82b725b343cea3634217a95d70e09e5d238d00ef861c6b94ac9b5f73cfee402b1d3e8e1cd50b6babb7347ff8d951d18f2408f5d90103a100a100a1190539a1646d656d6f816453454544
+590
+295 bytes
+172761 fee
+
+155381 + ((295 + 100) * 44) = 172761
+```
+
+```
+84a400d90102818258205a0989be2f5004617bf39e21b171b5102b55b1d726f5ecdc63978455b14a92c301018282581d601fe06353c9865e656eccf9c04fa79835cb257b27e535ce7113a86d151b00000009502f900082581d60f3216b24105d3b52d18f5ab135dcedf37ea2b9c8d05e7a4d96b579601b0000008d8f929063021a0002a389075820f903ad11046b4c65dadd5eef70d659c7dfaba9fab1cad1de4810e5bee6b85d75a100d9010281825820bca2c6f573270fba58116fa51263d8c00c0ba92f1c44abe2d107e1814fc650fb5840355afe95d7259903372e7999c775f120eb8f2790ea5fdf71ac374399cdfe273c28da12baa3adea20727baeba577c1290a56bd796cebb3f1bb94e68d8c587b003f5d90103a100a100a1190539a1646d656d6f816453454544
+598 
+299 bytes
+172937 fee
+
+155381 + (299 * 44)
+155381 + ((299 + 100) * 44) = 172937
+```
+
+Not sure why, but if I take the unsigned tx bytes and add 100 bytes, the fees
+are calculated perfectly.
+
+> Exception: Bad chain Cardano balance: USER-1 simulated: 40.00000000 ADA.ADA, mock: 240.00000000 ADA.ADA
+
+When reading that, simulated is the hardcoded json data, and mock is the
+mocknet. That's out because I've been running the tests multiple times for the
+same mocknet.
+
+Well, it got past the swap to `WITHDRAW:ADA.ADA:1000` but I see no mention of
+a swap on the maya/bifrost logs so I'm highly sus.
+
+Going back to the dash only smoke for a min to see what kind of logs I should be
+expecting for ada.
+
+> 5     USER-1 => VAULT      [SWAP:MAYA.CACAO:USER-1] 10.00000000 DASH.DASH
+> Exception: Bad chain Dash balance: USER-1 simulated: 29.99900000 DASH.DASH, mock: 0.00000000 DASH.DASH
+
+> 3 PROVIDER-1 => VAULT      [ADD:DASH.DASH:PROVIDER-1] 350.00000000 DASH.DASH
+> Bad chain Dash balance: USER-1 simulated: 40.00000000 DASH.DASH, mock: 0.00000000 DASH.DASH
+
+> 5     USER-1 => VAULT      [SWAP:MAYA.CACAO:USER-1] 10.00000000 DASH.DASH
+> Bad chain Dash balance: PROVIDER-1 simulated: 49.99900000 DASH.DASH, mock: 0.00000000 DASH.DASH
+
+Wow. I ran those 3 times without changing anything and got 3 different results.  
+That's amazing.
+
+Can I just wait for dash txs and fix all that?
+
+```bash
+curl --user mayachain:password --data-binary '{
+    "jsonrpc": "1.0",
+    "id": "curltest",
+    "method": "getrawtransaction",
+    "params": ["3c90825b1a96f2babfcd40285d3552a0e31946f6515b8e4d3a2977a37f552aed", true]
+}' -i -H 'content-type: application/json' http://127.0.0.1:19898/
+```
+
+```
+HTTP/1.1 200 OK
+Content-Type: application/json
+Date: Thu, 03 Apr 2025 08:51:25 GMT
+Content-Length: 921
+
+{"result":{"txid":"4c90825b1a96f2babfcd40285d3552a0e31946f6515b8e4d3a2977a37f552aed","version":2,"type":0,"size":90,"locktime":0,"vin":[{"coinbase":"02c5000101","sequence":4294967295}],"vout":[{"value":464.28571429,"valueSat":46428571429,"n":0,"scriptPubKey":{"asm":"OP_DUP OP_HASH160 a45ba2fbb1c21008d3de1d02d1fc9959280ba1c0 OP_EQUALVERIFY OP_CHECKSIG","hex":"76a914a45ba2fbb1c21008d3de1d02d1fc9959280ba1c088ac","address":"ybJVSgwoRTL51buZHb2RGDh4TP2RGQRRsJ","type":"pubkeyhash"}}],"hex":"02000000010000000000000000000000000000000000000000000000000000000000000000ffffffff0502c5000101ffffffff0125c75bcf0a0000001976a914a45ba2fbb1c21008d3de1d02d1fc9959280ba1c088ac00000000","blockhash":"0bb9248b3b9b81c6224d17cdb43364c2ac79e42482fffe5700758551d35325be","height":197,"confirmations":414,"time":1743670172,"blocktime":1743670172,"instantlock":true,"instantlock_internal":false,"chainlock":true},"error":null,"id":"curltest"}
+```
+
+```
+HTTP/1.1 500 Internal Server Error
+Content-Type: application/json
+Date: Thu, 03 Apr 2025 08:51:05 GMT
+Content-Length: 151
+
+{"result":null,"error":{"code":-5,"message":"No such mempool or blockchain transaction. Use gettransaction for wallet transactions."},"id":"curltest"}
+```
+
+Ok so poll the dash node for a non-500 for that tx hash...
+
+```python
+print(f"waiting for dash tx {txn.id}...")
+while True:
+    try:
+        self.call("getrawtransaction", txn.id, True)
+        return txn
+    except Exception as e:
+        print(f"Error: {e}, retrying in 1 second...")
+        time.sleep(1)
+```
+
+```
+aliases_dash = {
+    "MASTER": "yZnyJAdouDu3gmAuhG3dTc66hroS4AXxnL",
+    "CONTRIB": "yNR8UxqY4ZUq8wYYgJ19pW42mJ7xt2J8FU",
+    "USER-1": "yLLFQTxaW3wybbahkhyZcrdfqoRCnfzAV5",
+    "PROVIDER-1": "yXdzzagQPwWXdZzFD2vRmsYMxgeD6o9D2L",
+    "PROVIDER-2": "yZmg4bdi9oeN1b1UrkUYFCtMEiXUoSazYy",
+    "VAULT": "",
+}
+```
+
+```
+dash-cli getaddressbalance '"yXdzzagQPwWXdZzFD2vRmsYMxgeD6o9D2L"'
+dash-cli listunspent 1 99999999 '["yXdzzagQPwWXdZzFD2vRmsYMxgeD6o9D2L"]'
+
+dash-cli getaddressbalance '"ye8XkTcpXMMAkZS6jDvTWLh4RoqmbBQaUw"'
+dash-cli listunspent 1 99999999 '["ye8XkTcpXMMAkZS6jDvTWLh4RoqmbBQaUw"]'
+
+dash-cli getaddressbalance '"yLLFQTxaW3wybbahkhyZcrdfqoRCnfzAV5"'
+dash-cli listunspent 1 99999999 '["yLLFQTxaW3wybbahkhyZcrdfqoRCnfzAV5"]'
+
+dash-cli getaddressbalance '"yQYRdj1weg6yQAby26TSNSNGUaR11wKhyj"'
+dash-cli listunspent 1 99999999 '["yQYRdj1weg6yQAby26TSNSNGUaR11wKhyj"]'
+
+dash-cli getrawtransaction FA8FA9F74BC12227E558325972BBD63D7C6747A030BF9DC60E9EBD6901BE1366 true
+dash-cli getrawtransaction 847B16D0FD5902718FD59C1D401994F8E849C41842ECA5A0A7CB33997B49A536 true
+```
+
+```
+{
+  "balance": 0,
+  "balance_immature": 0,
+  "balance_spendable": 0,
+  "received": 44999900000
+}
+```
+
+Yeah on this occasion, it's my dash nodes that are confusing me. It's showing
+the received as 400 plus the 49.9 change from the 350 tx. But the change is not
+spendable, despite both transactions being chainlocked.
+
+```
+docker pull dashpay/dashd:latest
+
+docker run --rm -it --entrypoint bash dashpay/dashd:latest
+
+dash-cli --version
+Dash Core RPC client version v22.1.1
+```
+
+`registry.gitlab.com/mayachain/devops/node-launcher:dash-daemon-20.0.0`  
+`registry.gitlab.com/mayachain/devops/node-launcher:dash-daemon-21.1.1`  
+`registry.gitlab.com/mayachain/devops/node-launcher:dash-daemon-22.0.0`  
+`registry.gitlab.com/mayachain/devops/node-launcher:dash-daemon-19.2.0`  
+
+I turned my head away for what feels like a second, and now the dash smokes I
+thought worked are completely broken and erratic. I'm relying on those working
+to guide me in writing and verifying the cardano smokes. The frustrating thing
+is we get to:
+
+> 3 PROVIDER-1 => VAULT      [ADD:DASH.DASH:PROVIDER-1] 350.00000000 DASH.DASH
+
+it's complaining about:
+
+> Bad chain Dash balance: USER-1 simulated: 40.00000000 DASH.DASH, mock: 0.00000000 DASH.DASH
+
+And when I run (for user-1):
+
+```
+dash-cli getaddressbalance '"yLLFQTxaW3wybbahkhyZcrdfqoRCnfzAV5"'
+
+{
+  "balance": 0,
+  "balance_immature": 0,
+  "balance_spendable": 0,
+  "received": 4000000000
+}
+```
+
+It's showing balanced received but not spendable on a tx that's supposedly:
+
+```
+dash-cli getrawtransaction BBA91CCA56DA18CEE1BEC10B47C0FFA712C21CF4DF33C32CC72BBF4C5456FA03 true
+{
+  "txid": "bba91cca56da18cee1bec10b47c0ffa712c21cf4df33c32cc72bbf4c5456fa03",
+  "vin": [...],
+  "vout": [
+    {
+      "value": 40.00000000,
+      "scriptPubKey": {
+        "address": "yLLFQTxaW3wybbahkhyZcrdfqoRCnfzAV5",
+      },
+    },
+    {
+      "value": 959.99800000,
+      "scriptPubKey": {
+        "address": "yZnyJAdouDu3gmAuhG3dTc66hroS4AXxnL",
+      }
+    },
+    {
+      "value": 0.00000000,
+      "scriptPubKey": {
+        "asm": "OP_RETURN 1145390419",
+        "hex": "6a0453454544",
+        "type": "nulldata"
+      }
+    }
+  ],
+  "height": 615,
+  "confirmations": 56,
+  "instantlock": true,
+  "instantlock_internal": false,
+  "chainlock": true
+}
+```
+
+Yeah `chainlock`d with a load of confirmations. Why is that received amount not
+spendable??
+
+I'll try again with `19.2.0` tomorrow and if that doesn't work I'll have a think.
+
+Maybe I can just bruteforce my way mentally through the cardano smokes without
+these.
+
+#### 04.04.2025 Friday 5h 25m
+
+```
+>>>>>>>>>>>>>>> MISSING SIM EVENT
+Event fee
+'tx_id': '814C81BFEF7C1609060566DB7F9D08CE6D7E8506A9FDC6BBEEFD55DC9D82F396'
+'coins': '2000000000 MAYA.CACAO'
+'pool_deduct': '0'
+
+Event outbound |
+'in_tx_id': '814C81BFEF7C1609060566DB7F9D08CE6D7E8506A9FDC6BBEEFD55DC9D82F396'
+'id': '0000000000000000000000000000000000000000000000000000000000000000'
+'chain': 'MAYA'
+'from': 'tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6'
+'to': 'tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw'
+'coin': '298000000000 MAYA.CACAO'
+'memo': 'OUT:814C81BFEF7C1609060566DB7F9D08CE6D7E8506A9FDC6BBEEFD55DC9D82F396'
+
+Event pending_liquidity | 
+'pool': 'DASH.DASH'
+'type': 'withdraw'
+'cacao_address': 'tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw'
+'cacao_amount': '300000000000'
+'asset_amount': '0'
+'asset_address': 'yXdzzagQPwWXdZzFD2vRmsYMxgeD6o9D2L'
+'MAYA_txid': '814C81BFEF7C1609060566DB7F9D08CE6D7E8506A9FDC6BBEEFD55DC9D82F396'
+
+<<<<<<<<<<<<<<< EXTRA SIM EVENT
+
+Event refund | 
+'code': '105'
+'reason': 'asset cannot be cacao: unknown request'
+'id': 'CB5B13D588253BA59689DD42925FBB8723F6262E0A4E709CB7A71459DD73C7CE'
+'chain': 'MAYA'
+'from': 'tmaya1xwusttz86hqfuk5z7amcgqsg7vp6g8zhsk2n26'
+'to': 'tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6'
+'coin': '5000000000000 MAYA.CACAO'
+'memo': 'ADD:MAYA.CACAO'
+
+Event outbound |
+'in_tx_id': 'CB5B13D588253BA59689DD42925FBB8723F6262E0A4E709CB7A71459DD73C7CE'
+'id': 'TODO'
+'chain': 'MAYA'
+'from': 'tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6'
+'to': 'tmaya1xwusttz86hqfuk5z7amcgqsg7vp6g8zhsk2n26'
+'coin': '4998000000000 MAYA.CACAO'
+'memo': 'REFUND:CB5B13D588253BA59689DD42925FBB8723F6262E0A4E709CB7A71459DD73C7CE'
+
+Event refund | 
+'code': '105'
+'reason': 'refund reason message; fail to refund (1 MAYA.CACAO): not enough asset to pay for fees'
+'id': '814C81BFEF7C1609060566DB7F9D08CE6D7E8506A9FDC6BBEEFD55DC9D82F396'
+'chain': 'MAYA'
+'from': 'tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw'
+'to': 'tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6'
+'coin': '1 MAYA.CACAO'
+'memo': 'WITHDRAW:DASH.DASH:1000'
+E[2025-04-03 09:32:52,053] Events mismatch
+```
+
+> asset cannot be cacao
+
+Where can I see these events actually happening?
+
+We're only interested in MsgDeposit and MsgSend.  
+If you search for `_pb` in `smoke/` you'll see some other types.  
+
+MsgDepgoosit_pb  
+MsgSend_pb  
+Thor_Coin_pb  
+Coin_pb  
+Asset_pb  
+
+for each block we check:
+- events
+- pools
+- each chain (balances)
+- health
+
+```
+MsgDeposit
+tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw
+ADD:DASH.DASH:yXdzzagQPwWXdZzFD2vRmsYMxgeD6o9D2L
+MAYA.CACAO 300000000000
+
+type: pending_liquidity
+attributes:
+  asset_address        yXdzzagQPwWXdZzFD2vRmsYMxgeD6o9D2L
+  MAYA_txid            0EFD45FF9FA95950109C125F176BEE37ED14532875F627D6D58E334F5BF7F6D8
+  pool                 DASH.DASH
+  type                 add
+  cacao_address        tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw
+  cacao_amount         300000000000
+  asset_amount         0
+```
+
+That's as far as the smoke gets.
+
+Going to run my demotest script with the above logging to see what maya actually
+reports.
+
+```
+go get github.com/alexdcox/cardano-go@v0.1.10
+```
+
+```
+go get github.com/alexdcox/cardano-go@v0.1.11
+go: downloading github.com/alexdcox/cardano-go v0.1.10
+go: github.com/alexdcox/cardano-go@v0.1.10: verifying module: github.com/alexdcox/cardano-go@v0.1.10: reading https://sum.golang.org/lookup/github.com/alexdcox/cardano-go@v0.1.10: 404 Not Found
+  server response: not found: github.com/alexdcox/cardano-go@v0.1.10: invalid version: unknown revision v0.1.10
+```
+
+huh??
+
+```
+curl https://sum.golang.org/lookup/github.com/alexdcox/cardano-go@v0.1.10
+curl https://sum.golang.org/lookup/github.com/alexdcox/cardano-go@v0.1.11
+```
+
+Never had that issue before, had to push another version for no reason.
+
+Ah my demotest no longer works because I send everything to the master address
+now not the faucet.
+
+To convert from private key hex to cbor:  
+Add the 2 byte cbor prefix to denote a hex string of length 32: `5820`  
+I'd like to point out again: having a hex string of encoded cbor hex is a bit silly.  
+
+```
+mayanode keys add demo --keyring-backend file --recover
+mayanode keys delete demo --keyring-backend file
+```
+
+This is what I captured from my test script that swaps dash/ada and visa versa:
+
+```
+MsgSend
+tmaya1743ykraxawyyau7ca7e3djh4djc8e3edaz4qvs --> tmaya1wep80ynx5m4n26h4uvj9yrlvlc0q6jjcsmdudu
+amount: cacao 10000000000
+
+MsgDeposit
+tmaya1wep80ynx5m4n26h4uvj9yrlvlc0q6jjcsmdudu
+add:ada.ada:addr_test1vrejz6eyzpwnk5k33adtzdwuahehag4eerg9u7jdj66hjcqzwpg7z
+coin: MAYA.CACAO 1000000000
+
+event: pending_liquidity
+attributes:
+  pool                 ADA.ADA
+  type                 add
+  cacao_address        tmaya1wep80ynx5m4n26h4uvj9yrlvlc0q6jjcsmdudu
+  cacao_amount         1000000000
+  asset_amount         0
+  asset_address        addr_test1vrejz6eyzpwnk5k33adtzdwuahehag4eerg9u7jdj66hjcqzwpg7z
+  MAYA_txid            AD97D56B6C8DCA21827936A60B8405A2D8123043120FEE595E470A2DED4920A2
+
+MsgObservedTxIn
+tmaya1743ykraxawyyau7ca7e3djh4djc8e3edaz4qvs
+tx [0]
+  56eee772701b8b85c54eef268b92ff899df85773ad1f2ce2a95d12d8db8c38ec
+  ADA | addr_test1vrejz6eyzpwnk5k33adtzdwuahehag4eerg9u7jdj66hjcqzwpg7z --> addr_test1vpzqxy72yvjj8htzrn2h9he84w56qptckls6mupuntdgtwcnekknd
+  coin: ADA.ADA 10000000
+  gas: ADA.ADA 175093
+  add:ada.ada:tmaya1wep80ynx5m4n26h4uvj9yrlvlc0q6jjcsmdudu
+
+event: pool
+attributes:
+  pool                 ADA.ADA
+  pool_status          Available
+
+event: add_liquidity
+attributes:
+  pool                 ADA.ADA
+  liquidity_provider_units 1000000000
+  cacao_address        tmaya1wep80ynx5m4n26h4uvj9yrlvlc0q6jjcsmdudu
+  cacao_amount         1000000000
+  asset_amount         10000000
+  asset_address        addr_test1vrejz6eyzpwnk5k33adtzdwuahehag4eerg9u7jdj66hjcqzwpg7z
+  MAYA_txid            AD97D56B6C8DCA21827936A60B8405A2D8123043120FEE595E470A2DED4920A2
+  ADA_txid             56EEE772701B8B85C54EEF268B92FF899DF85773AD1F2CE2A95D12D8DB8C38EC
+
+MsgDeposit
+tmaya1wep80ynx5m4n26h4uvj9yrlvlc0q6jjcsmdudu
+add:dash.dash:yX6kD415WGpwwDkb1AEgJettjj775KSSUZ
+coin: MAYA.CACAO 1000000000
+
+event: pending_liquidity
+attributes:
+  MAYA_txid            3479ADF7AB103D19EDD0CD6F2C8DCD51DC87158857F9288EE93F0107E790702E
+  pool                 DASH.DASH
+  type                 add
+  cacao_address        tmaya1wep80ynx5m4n26h4uvj9yrlvlc0q6jjcsmdudu
+  cacao_amount         1000000000
+  asset_amount         0
+  asset_address        yX6kD415WGpwwDkb1AEgJettjj775KSSUZ
+
+MsgObservedTxIn
+tmaya1743ykraxawyyau7ca7e3djh4djc8e3edaz4qvs
+tx [0]
+  130645fa95326a010761e04b506bdb64d1cf1134f0fd89041b6dff64422fb12e
+  DASH | yX6kD415WGpwwDkb1AEgJettjj775KSSUZ --> yigv9jV5cp3bD7DBqEPUYU9T3aNSV27hHn
+  coin: DASH.DASH 10000000000
+  gas: DASH.DASH 1000000
+  add:dash.dash:tmaya1wep80ynx5m4n26h4uvj9yrlvlc0q6jjcsmdudu
+
+event: pool
+attributes:
+  pool_status          Available
+  pool                 DASH.DASH
+
+event: add_liquidity
+attributes:
+  liquidity_provider_units 1000000000
+  cacao_address        tmaya1wep80ynx5m4n26h4uvj9yrlvlc0q6jjcsmdudu
+  cacao_amount         1000000000
+  asset_amount         10000000000
+  asset_address        yX6kD415WGpwwDkb1AEgJettjj775KSSUZ
+  MAYA_txid            3479ADF7AB103D19EDD0CD6F2C8DCD51DC87158857F9288EE93F0107E790702E
+  DASH_txid            130645FA95326A010761E04B506BDB64D1CF1134F0FD89041B6DFF64422FB12E
+  pool                 DASH.DASH
+
+MsgObservedTxIn
+tmaya1743ykraxawyyau7ca7e3djh4djc8e3edaz4qvs
+tx [0]
+  247cff5e37d8abcef7242aaebd07900008ab1820a4053cfb95b4c52f412a5657
+  ADA | addr_test1vrejz6eyzpwnk5k33adtzdwuahehag4eerg9u7jdj66hjcqzwpg7z --> addr_test1vpzqxy72yvjj8htzrn2h9he84w56qptckls6mupuntdgtwcnekknd
+  coin: ADA.ADA 10000000
+  gas: ADA.ADA 174785
+  swap:dash.dash:yLSoLMPjodakdpQsoaV6HcDds1RDe8JsRu
+
+event: swap
+attributes:
+  pool                 ADA.ADA
+  streaming_swap_count 1
+  id                   247CFF5E37D8ABCEF7242AAEBD07900008AB1820A4053CFB95B4C52F412A5657
+  coin                 10000000 ADA.ADA
+  emit_asset           250000000 MAYA.CACAO
+  streaming_swap_quantity 1
+  to                   addr_test1vpzqxy72yvjj8htzrn2h9he84w56qptckls6mupuntdgtwcnekknd
+  memo                 swap:dash.dash:yLSoLMPjodakdpQsoaV6HcDds1RDe8JsRu
+  swap_target          0
+  swap_slip            5000
+  chain                ADA
+  from                 addr_test1vrejz6eyzpwnk5k33adtzdwuahehag4eerg9u7jdj66hjcqzwpg7z
+  liquidity_fee        250000000
+  liquidity_fee_in_cacao 250000000
+
+event: swap
+attributes:
+  id                   247CFF5E37D8ABCEF7242AAEBD07900008AB1820A4053CFB95B4C52F412A5657
+  chain                ADA
+  liquidity_fee        400000000
+  liquidity_fee_in_cacao 40000000
+  streaming_swap_quantity 1
+  streaming_swap_count 1
+  memo                 swap:dash.dash:yLSoLMPjodakdpQsoaV6HcDds1RDe8JsRu
+  swap_slip            2000
+  pool                 DASH.DASH
+  emit_asset           1600000000 DASH.DASH
+  from                 addr_test1vrejz6eyzpwnk5k33adtzdwuahehag4eerg9u7jdj66hjcqzwpg7z
+  to                   addr_test1vpzqxy72yvjj8htzrn2h9he84w56qptckls6mupuntdgtwcnekknd
+  coin                 250000000 MAYA.CACAO
+  swap_target          0
+
+event: fee
+attributes:
+  pool_deduct          1074
+  tx_id                247CFF5E37D8ABCEF7242AAEBD07900008AB1820A4053CFB95B4C52F412A5657
+  coins                7216 DASH.DASH
+
+event: scheduled_outbound
+attributes:
+  coin_amount          1599992784
+  memo                 OUT:247CFF5E37D8ABCEF7242AAEBD07900008AB1820A4053CFB95B4C52F412A5657
+  chain                DASH
+  coin_asset           DASH.DASH
+  gas_rate             12
+  out_hash             
+  module_name          
+  max_gas_asset_0      DASH.DASH
+  max_gas_decimals_0   8
+  vault_pub_key        tmayapub1addwnpepqwpkzz8qwjker2u7u2dtr75y09almt55jdt9d9r30r39pgse5dpmxerl8ay
+  in_hash              247CFF5E37D8ABCEF7242AAEBD07900008AB1820A4053CFB95B4C52F412A5657
+  to_address           yLSoLMPjodakdpQsoaV6HcDds1RDe8JsRu
+  max_gas_amount_0     5412
+  coin_decimals        0
+
+event: rewards
+attributes:
+  bond_reward          232000000
+  ADA.ADA              -250000000
+  DASH.DASH            -40000000
+
+MsgObservedTxOut
+tmaya1743ykraxawyyau7ca7e3djh4djc8e3edaz4qvs
+
+event: tss_keysign
+attributes:
+  txid                 04B8EDCB7785F67AA46C074D0FD23819005E9066025827A098F64110CA82B7FF
+  median_duration_ms   7
+
+event: outbound
+attributes:
+  chain                DASH
+  from                 yigv9jV5cp3bD7DBqEPUYU9T3aNSV27hHn
+  to                   yLSoLMPjodakdpQsoaV6HcDds1RDe8JsRu
+  coin                 1599996036 DASH.DASH
+  memo                 OUT:247CFF5E37D8ABCEF7242AAEBD07900008AB1820A4053CFB95B4C52F412A5657
+  in_tx_id             247CFF5E37D8ABCEF7242AAEBD07900008AB1820A4053CFB95B4C52F412A5657
+  id                   04B8EDCB7785F67AA46C074D0FD23819005E9066025827A098F64110CA82B7FF
+
+event: gas
+attributes:
+  asset                DASH.DASH
+  asset_amt            5412
+  cacao_amt            780
+  transaction_count    1
+
+MsgObservedTxIn
+tmaya1743ykraxawyyau7ca7e3djh4djc8e3edaz4qvs
+tx [0]
+  68123941ba46f8f43d3906b5b81752e20b92b387c772a5065b4a21b3d53595d7
+  DASH | yX6kD415WGpwwDkb1AEgJettjj775KSSUZ --> yigv9jV5cp3bD7DBqEPUYU9T3aNSV27hHn
+  coin: DASH.DASH 10000000000
+  gas: DASH.DASH 1000000
+  swap:ada.ada:addr_test1vzn0dy5vt8gq8qacp7gnetg0hjwxgtv2tzfn44d4plp80jc8sz7rv
+
+event: swap
+attributes:
+  swap_slip            5435
+  memo                 swap:ada.ada:addr_test1vzn0dy5vt8gq8qacp7gnetg0hjwxgtv2tzfn44d4plp80jc8sz7rv
+  emit_asset           300212598 MAYA.CACAO
+  streaming_swap_count 1
+  chain                DASH
+  from                 yX6kD415WGpwwDkb1AEgJettjj775KSSUZ
+  to                   yigv9jV5cp3bD7DBqEPUYU9T3aNSV27hHn
+  liquidity_fee        357395873
+  liquidity_fee_in_cacao 357395873
+  swap_target          0
+  id                   68123941BA46F8F43D3906B5B81752E20B92B387C772A5065B4A21B3D53595D7
+  coin                 10000000000 DASH.DASH
+  pool                 DASH.DASH
+  streaming_swap_quantity 1
+
+event: swap
+attributes:
+  streaming_swap_quantity 1
+  emit_asset           4688329 ADA.ADA
+  id                   68123941BA46F8F43D3906B5B81752E20B92B387C772A5065B4A21B3D53595D7
+  coin                 300212598 MAYA.CACAO
+  memo                 swap:ada.ada:addr_test1vzn0dy5vt8gq8qacp7gnetg0hjwxgtv2tzfn44d4plp80jc8sz7rv
+  liquidity_fee        2814991
+  swap_target          0
+  chain                DASH
+  pool                 ADA.ADA
+  liquidity_fee_in_cacao 70374775
+  streaming_swap_count 1
+  from                 yX6kD415WGpwwDkb1AEgJettjj775KSSUZ
+  to                   yigv9jV5cp3bD7DBqEPUYU9T3aNSV27hHn
+  swap_slip            3752
+
+event: fee
+attributes:
+  tx_id                68123941BA46F8F43D3906B5B81752E20B92B387C772A5065B4A21B3D53595D7
+  coins                310762 ADA.ADA
+  pool_deduct          15917858
+
+event: scheduled_outbound
+attributes:
+  vault_pub_key        tmayapub1zcjduepq9g0ktqutjwjuz7a6pz3fq52q7dydwn7j6qqc076cnck7s0e00c2skusje2
+  out_hash             
+  module_name          
+  max_gas_asset_0      ADA.ADA
+  max_gas_decimals_0   6
+  coin_asset           ADA.ADA
+  coin_amount          4377567
+  coin_decimals        0
+  gas_rate             233000
+  max_gas_amount_0     233000
+  chain                ADA
+  to_address           addr_test1vzn0dy5vt8gq8qacp7gnetg0hjwxgtv2tzfn44d4plp80jc8sz7rv
+  memo                 OUT:68123941BA46F8F43D3906B5B81752E20B92B387C772A5065B4A21B3D53595D7
+  in_hash              68123941BA46F8F43D3906B5B81752E20B92B387C772A5065B4A21B3D53595D7
+
+event: rewards
+attributes:
+  bond_reward          342216518
+  ADA.ADA              -70374775
+  DASH.DASH            -357395873
+
+MsgSolvency
+tmaya1743ykraxawyyau7ca7e3djh4djc8e3edaz4qvs
+coin: ADA.ADA 10000000
+
+event: set_mimir
+attributes:
+  value                37
+  key                  SOLVENCYHALTADACHAIN
+
+MsgObservedTxOut
+tmaya1743ykraxawyyau7ca7e3djh4djc8e3edaz4qvs
+
+event: tss_keysign
+attributes:
+  txid                 9F22A9B982F3AD7B8197D9C689104ED44DC2DC4FB922DD9B33A26C8A5D974A3F
+  median_duration_ms   761
+
+event: security
+attributes:
+  memo                 OUT:68123941BA46F8F43D3906B5B81752E20B92B387C772A5065B4A21B3D53595D7
+  msg                  missing tx out in=68123941BA46F8F43D3906B5B81752E20B92B387C772A5065B4A21B3D53595D7
+  id                   9F22A9B982F3AD7B8197D9C689104ED44DC2DC4FB922DD9B33A26C8A5D974A3F
+  chain                ADA
+  from                 addr_test1vpzqxy72yvjj8htzrn2h9he84w56qptckls6mupuntdgtwcnekknd
+  to                   addr_test1vzn0dy5vt8gq8qacp7gnetg0hjwxgtv2tzfn44d4plp80jc8sz7rv
+  coin                 4201902 ADA.ADA
+
+event: gas
+attributes:
+  asset                ADA.ADA
+  asset_amt            175665
+  cacao_amt            8027607
+  transaction_count    1
+
+MsgSolvency
+tmaya1743ykraxawyyau7ca7e3djh4djc8e3edaz4qvs
+coin: ADA.ADA 15622433
+
+event: set_mimir
+attributes:
+  key                  SOLVENCYHALTADACHAIN
+  value                0
+```
+
+#### 06.04.2025 Sunday 6h 50m
+
+For the smokes, we're not getting the `MsgObservedTxIn` or `add_liquidity`
+events for the ada to vault liquidity provision step.
+
+It says this:
+```
+3 PROVIDER-1 => VAULT      [ADD:ADA.ADA:PROVIDER-1] 0.10000000 ADA.ADA
+#!# @transfer addr_test1vq07qc6nexr9uetwenuuqna8nq6ukftmyljntnn3zw5x69geav0we => addr_test1vzxvnnudl2nsunhyux942470e09w428769tslkj24kxa3ygz2p3l2 [ADD:ADA.ADA:tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw] 0.10000000 ADA.ADA | Gas 0.00175093 ADA.ADA | ID 78672446207217CDFFC389000B01097B8BED7B2566ADEF0EC7BFB784676DA45C
+waiting for cardano tx: 78672446207217cdffc389000b01097b8bed7b2566adef0ec7bfb784676da45c
+```
+
+And I can fetch that tx:
+
+```
+{
+    "hash": "78672446207217cdffc389000b01097b8bed7b2566adef0ec7bfb784676da45c",
+    "inputs": [
+        {
+            "hash": "28435d80dba92dc31e8395cbb1af56ac34ebed47478721f581d95e8ce7a9814f",
+            "index": 0
+        }
+    ],
+    "outputs": [
+        {
+            "amount": 10000000,
+            "address": "addr_test1vzxvnnudl2nsunhyux942470e09w428769tslkj24kxa3ygz2p3l2"
+        },
+        {
+            "amount": 39989824907,
+            "address": "addr_test1vq07qc6nexr9uetwenuuqna8nq6ukftmyljntnn3zw5x69geav0we"
+        }
+    ],
+    "memo": "ADD:ADA.ADA:tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw",
+    "fee": 175093
+}
+```
+
+The address `tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw` matches `PROVIDER-1`.  
+The address `addr_test1vzxvnnudl2nsunhyux942470e09w428769tslkj24kxa3ygz2p3l2` matches the ada vault address.  
+
+The step before registers P1 as the address to expect the matching ada tx:
+
+```
+2 PROVIDER-1 => VAULT      [ADD:ADA.ADA:PROVIDER-1] 10.00000000 MAYA.CACAO
+#!# @transfer tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw => tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6 [ADD:ADA.ADA:addr_test1vq07qc6nexr9uetwenuuqna8nq6ukftmyljntnn3zw5x69geav0we] 10.00000000 MAYA.CACAO | Gas 20.00000000 MAYA.CACAO | ID 573CC030E26B78E19BA3F22F57E2819375023A365F38733D11412CDF4005CEFE
+```
+
+What ada block are we on?  
+Maybe it's stuck on this `invalid tx type: SEED`.  
+That was it.  
+
+> fail to sign and broadcast tx out store item error="Command failed:
+  transaction build  Error: The transaction does balance in its use of ada,
+  however the net balance does not meet the minimum UTxO threshold. \nBalance:
+  134965 Lovelace\nOffending output (change output):
+  addr_test1vzhhk9xe09s6zc2z3a8hyfzjpezh04fwtjlgvwfwws5elzg7gynlk + 134965
+  lovelace\nMinimum UTxO threshold: 849070 Lovelace\nThe usual solution is to
+  provide more inputs, or inputs with more ada to meet the minimum UTxO
+  threshold\n: node command failed" module=signer service=bifrost
+
+I added 200,000 as a fee buffer.  
+That broke multiple txins for the rpc build.  
+Fixed that.  
+
+> 'Asset' object has no attribute 'is_ada'
+
+```
+failed to send all outbound transactions 1
+
+>>>>>>>>>>>>>>> MISSING SIM EVENT
+Event withdraw | {'pool': 'ADA.ADA'} {'liquidity_provider_units': '100000000000'} {'basis_points': '10000'} {'asymmetry': '0.000000000000000000'} {'emit_asset': '10767000'} {'emit_cacao': '90909090911'} {'imp_loss_protection': '0'} {'id': 'DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F'} {'chain': 'MAYA'} {'from': 'tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw'} {'to': 'tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6'} {'coin': '1 MAYA.CACAO'} {'memo': 'WITHDRAW:ADA.ADA:10000'}
+<<<<<<<<<<<<<<< EXTRA SIM EVENT
+Event withdraw | {'pool': 'ADA.ADA'} {'liquidity_provider_units': '100000000000'} {'basis_points': '10000'} {'asymmetry': '0.000000000000000000'} {'emit_asset': '10740859'} {'emit_cacao': '90909090911'} {'imp_loss_protection': '0'} {'id': 'DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F'} {'chain': 'MAYA'} {'from': 'tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw'} {'to': 'tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6'} {'coin': '1 MAYA.CACAO'} {'memo': 'WITHDRAW:ADA.ADA:10000'}
+
+>>>>>>>>>>>>>>> MISSING SIM EVENT
+Event scheduled_outbound | {'chain': 'ADA'} {'to_address': 'addr_test1vq07qc6nexr9uetwenuuqna8nq6ukftmyljntnn3zw5x69geav0we'} {'vault_pub_key': 'tmayapub1zcjduepqrtlxy5qe7tanpnlz3h2rhy39pk5ugcs0zxdse7u5xhmksv880mrqqap09w'} {'coin_asset': 'ADA.ADA'} {'coin_amount': '10767000'} {'coin_decimals': '0'} {'memo': 'OUT:DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F'} {'gas_rate': '233000'} {'in_hash': 'DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F'} {'out_hash': ''} {'module_name': ''} {'max_gas_asset_0': 'ADA.ADA'} {'max_gas_amount_0': '233000'} {'max_gas_decimals_0': '0'}
+<<<<<<<<<<<<<<< EXTRA SIM EVENT
+Event scheduled_outbound | {'chain': 'ADA'} {'to_address': 'addr_test1vq07qc6nexr9uetwenuuqna8nq6ukftmyljntnn3zw5x69geav0we'} {'vault_pub_key': 'tmayapub1addwnpepqfshfcy7f95v8gzgpl44vgfduy2tg26lhpw5q2xdhtu3esmq0x54qngqnnw'} {'coin_asset': 'ADA.ADA'} {'coin_amount': '10767000'} {'coin_decimals': '0'} {'memo': 'OUT:DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F'} {'gas_rate': '233000'} {'in_hash': 'DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F'} {'out_hash': ''} {'module_name': ''} {'max_gas_asset_0': 'ADA.ADA'} {'max_gas_amount_0': '233000'} {'max_gas_decimals_0': '0'}
+
+Events mismatch
+
+Bad chain Cardano balance: PROVIDER-1 simulated: 400.00565766 ADA.ADA, mock: 399.89824907 ADA.ADA
+Bad chain Cardano balance: VAULT simulated: 0.00259141 ADA.ADA, mock: 0.11000000 ADA.ADA
+```
+
+When it comes to calculating cardano tx fees, I honestly think it's better to
+just build the tx due to the way cbor compression works.
+
+Needed a cbor tag around the signers array on tx submission.  
+Now I think I'm estimating the tx submission size correctly.  
+Added a http endpoint for that...  
+
+When calculating which utxos to use, I was adding the fee, but I think we
+actually need to add the minutxo amount because that's 4x the fee so we're
+getting situations where the fee is covered but the tx still fails because the
+fee utxo is too small.
+
+```
+9:02PM ERR bifrost/signer/sign.go:660 > fail to sign tx error="Command failed:
+transaction build  Error: The transaction does balance in its use of ada,
+however the net balance does not meet the minimum UTxO threshold. \nBalance:
+51307 Lovelace\nOffending output (change output):
+addr_test1vqrhzqra0tg8njw44eyvtv3pwmjh046vzk8d2ccx2kcqrwg3zxk6l + 51307
+lovelace\nMinimum UTxO threshold: 849070 Lovelace\nThe usual solution is to
+provide more inputs, or inputs with more ada to meet the minimum UTxO
+threshold\n: node command failed" module=signer service=bifrost
+```
+
+```
+CMD IN
+/usr/local/bin/cardano-cli conway transaction build --cardano-mode --change-address addr_test1vqu0qtcaz2k2wf2vsxqgskd9nh23atqvt8e0g9sryp5py2q7ksfvk --out-file /dev/stdout --tx-in 193e0009cf4697617911ed036dd9dbd4a0a50381beee3fc08ecdbcafe1e3c4dd#0 --tx-in f897ebafe267b9eb26687daddb2e1f19338dad44941685ca84650e3940c048b3#0 --tx-out addr_test1vq07qc6nexr9uetwenuuqna8nq6ukftmyljntnn3zw5x69geav0we+10767000 --metadata-json-file /dev/fd/3
+--------------------------------------------------
+CMD OUT
+Command failed: transaction build  Error: The transaction does balance in its use of ada, however the net balance does not meet the minimum UTxO threshold.
+Balance: 51307 Lovelace
+Offending output (change output): addr_test1vqu0qtcaz2k2wf2vsxqgskd9nh23atqvt8e0g9sryp5py2q7ksfvk + 51307 lovelace
+Minimum UTxO threshold: 849070 Lovelace
+The usual solution is to provide more inputs, or inputs with more ada to meet the minimum UTxO threshold
+```
+
+The python `Coin` class doesn't automatically change precision based on asset.  
+
+In fact, the `__str__` method - which I understand to be the format used in the
+smoke test logs - ONLY uses 8 decimal place formatting. This is a level of far
+beyond what I ever wanted to go in implemeting cardano/ada. I need the values
+to be displayed correctly though or else how the hell am I going to make sense
+of it.
+
+```
+#!# balance: 11000000
+#!# intendedSendAmount: 10767000
+#!# intendedSendAmountWithFee: 10467000
+#!# changeAmountEstimated: 533000
+WRN change amount is less than utxo, subtracting an additional 317000 fee from send amount to ensure change is at least min utxo amount
+#!# intendedSendAmountWithFee (updated): 10150000
+ERR fail to sign tx The transaction does balance in its use of ada, however the net balance does not meet the minimum UTxO threshold.
+Balance: 668307 Lovelace
+Offending output (change output): addr_test1vqcv3dflr296equwlawm28va7d3dj2k7n2fh2qwkxf9z6tgg6ahq9 + 668307 lovelace
+Minimum UTxO threshold: 849070 Lovelace
+The usual solution is to provide more inputs, or inputs with more ada to meet the minimum UTxO threshold
+```
+
+```
+11000000 - 10150000 = 850000
+```
+
+Uhhhhh.  
+Think I forgot to add the fee to the threshold diff.  
+
+That got to the end of the smokes.  
+With errors.  
+But it actually completed, maya did the things. It's the python sim that's not
+quite right on a few calculations and undoubtedly the events.json.
+
+#### 07.04.2025 Monday 6h
+
+So my last smoke actually ran to completion. Need to update the python calcs a 
+bit I think...
+
+This is the result:
+
+```
+>>>>>>>>>>>>>>> MISSING SIM EVENT
+Event withdraw | {'pool': 'ADA.ADA'} {'liquidity_provider_units': '100000000000'} {'basis_points': '10000'} {'asymmetry': '0.000000000000000000'} {'emit_asset': '10767000'} {'emit_cacao': '90909090911'} {'imp_loss_protection': '0'} {'id': 'DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F'} {'chain': 'MAYA'} {'from': 'tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw'} {'to': 'tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6'} {'coin': '1 MAYA.CACAO'} {'memo': 'WITHDRAW:ADA.ADA:10000'}
+>>>>>>>>>>>>>>> MISSING SIM EVENT
+Event tss_keysign | {'txid': '2D5807E9F25735A149B35971CCC39471DBDFAE76D1DC0CDCDCB9C716E9345F18'} {'median_duration_ms': '774'}
+>>>>>>>>>>>>>>> MISSING SIM EVENT
+Event security | {'msg': 'missing tx out in=DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F'} {'id': '2D5807E9F25735A149B35971CCC39471DBDFAE76D1DC0CDCDCB9C716E9345F18'} {'chain': 'ADA'} {'from': 'addr_test1vp6k6w99xnapkt9v76mheaj5lyrw775vqhket7y3znjwkkq2ekt84'} {'to': 'addr_test1vq07qc6nexr9uetwenuuqna8nq6ukftmyljntnn3zw5x69geav0we'} {'coin': '9968307 ADA.ADA'} {'memo': 'OUT:DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F'}
+>>>>>>>>>>>>>>> MISSING SIM EVENT
+Event scheduled_outbound | {'chain': 'ADA'} {'to_address': 'addr_test1vq07qc6nexr9uetwenuuqna8nq6ukftmyljntnn3zw5x69geav0we'} {'vault_pub_key': 'tmayapub1zcjduepqc0a92w838jawvqnwkrsrfr4j3cnmwhsra5l255dh4h532d87v74qnhnzvc'} {'coin_asset': 'ADA.ADA'} {'coin_amount': '10767000'} {'coin_decimals': '0'} {'memo': 'OUT:DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F'} {'gas_rate': '233000'} {'in_hash': 'DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F'} {'out_hash': ''} {'module_name': ''} {'max_gas_asset_0': 'ADA.ADA'} {'max_gas_amount_0': '233000'} {'max_gas_decimals_0': '0'}
+<<<<<<<<<<<<<<< EXTRA SIM EVENT
+Event withdraw | {'pool': 'ADA.ADA'} {'liquidity_provider_units': '100000000000'} {'basis_points': '10000'} {'asymmetry': '0.000000000000000000'} {'emit_asset': '10740859'} {'emit_cacao': '90909090911'} {'imp_loss_protection': '0'} {'id': 'DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F'} {'chain': 'MAYA'} {'from': 'tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw'} {'to': 'tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6'} {'coin': '1 MAYA.CACAO'} {'memo': 'WITHDRAW:ADA.ADA:10000'}
+<<<<<<<<<<<<<<< EXTRA SIM EVENT
+Event rewards | {'bond_reward': '661157024'} {'ADA.ADA': '-826446280'}
+<<<<<<<<<<<<<<< EXTRA SIM EVENT
+Event outbound | {'in_tx_id': 'DC6CDEBB4CAB2B8C257AB288326F85B7F8133796AEADC28FE30D14B460D749FD'} {'id': 'TODO'} {'chain': 'MAYA'} {'from': 'tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6'} {'to': 'tmaya1z63f3mzwv3g75az80xwmhrawdqcjpaekkcgpz9'} {'coin': '6264462809 MAYA.CACAO'} {'memo': 'OUT:DC6CDEBB4CAB2B8C257AB288326F85B7F8133796AEADC28FE30D14B460D749FD'}
+<<<<<<<<<<<<<<< EXTRA SIM EVENT
+Event scheduled_outbound | {'chain': 'ADA'} {'to_address': 'addr_test1vq07qc6nexr9uetwenuuqna8nq6ukftmyljntnn3zw5x69geav0we'} {'vault_pub_key': 'tmayapub1addwnpepqwyvauw5sxu0346q2nzkqt4v7hkvtf35f2urd8mdhe7wkxp08lgvkzy30pa'} {'coin_asset': 'ADA.ADA'} {'coin_amount': '10767000'} {'coin_decimals': '0'} {'memo': 'OUT:DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F'} {'gas_rate': '233000'} {'in_hash': 'DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F'} {'out_hash': ''} {'module_name': ''} {'max_gas_asset_0': 'ADA.ADA'} {'max_gas_amount_0': '233000'} {'max_gas_decimals_0': '0'}
+E[2025-04-08 00:08:12,703] Events mismatch
+
+E[2025-04-08 00:08:12,703] failed to send all outbound transactions 1
+>>>>>>>>>>>>>>> MISSING SIM EVENT
+Event withdraw | {'pool': 'ADA.ADA'} {'liquidity_provider_units': '100000000000'} {'basis_points': '10000'} {'asymmetry': '0.000000000000000000'} {'emit_asset': '10767000'} {'emit_cacao': '90909090911'} {'imp_loss_protection': '0'} {'id': 'DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F'} {'chain': 'MAYA'} {'from': 'tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw'} {'to': 'tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6'} {'coin': '1 MAYA.CACAO'} {'memo': 'WITHDRAW:ADA.ADA:10000'}
+>>>>>>>>>>>>>>> MISSING SIM EVENT
+Event tss_keysign | {'txid': '2D5807E9F25735A149B35971CCC39471DBDFAE76D1DC0CDCDCB9C716E9345F18'} {'median_duration_ms': '774'}
+>>>>>>>>>>>>>>> MISSING SIM EVENT
+Event security | {'msg': 'missing tx out in=DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F'} {'id': '2D5807E9F25735A149B35971CCC39471DBDFAE76D1DC0CDCDCB9C716E9345F18'} {'chain': 'ADA'} {'from': 'addr_test1vp6k6w99xnapkt9v76mheaj5lyrw775vqhket7y3znjwkkq2ekt84'} {'to': 'addr_test1vq07qc6nexr9uetwenuuqna8nq6ukftmyljntnn3zw5x69geav0we'} {'coin': '9968307 ADA.ADA'} {'memo': 'OUT:DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F'}
+>>>>>>>>>>>>>>> MISSING SIM EVENT
+Event scheduled_outbound | {'chain': 'ADA'} {'to_address': 'addr_test1vq07qc6nexr9uetwenuuqna8nq6ukftmyljntnn3zw5x69geav0we'} {'vault_pub_key': 'tmayapub1zcjduepqc0a92w838jawvqnwkrsrfr4j3cnmwhsra5l255dh4h532d87v74qnhnzvc'} {'coin_asset': 'ADA.ADA'} {'coin_amount': '10767000'} {'coin_decimals': '0'} {'memo': 'OUT:DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F'} {'gas_rate': '233000'} {'in_hash': 'DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F'} {'out_hash': ''} {'module_name': ''} {'max_gas_asset_0': 'ADA.ADA'} {'max_gas_amount_0': '233000'} {'max_gas_decimals_0': '0'}
+<<<<<<<<<<<<<<< EXTRA SIM EVENT
+Event withdraw | {'pool': 'ADA.ADA'} {'liquidity_provider_units': '100000000000'} {'basis_points': '10000'} {'asymmetry': '0.000000000000000000'} {'emit_asset': '10740859'} {'emit_cacao': '90909090911'} {'imp_loss_protection': '0'} {'id': 'DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F'} {'chain': 'MAYA'} {'from': 'tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw'} {'to': 'tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6'} {'coin': '1 MAYA.CACAO'} {'memo': 'WITHDRAW:ADA.ADA:10000'}
+<<<<<<<<<<<<<<< EXTRA SIM EVENT
+Event rewards | {'bond_reward': '661157024'} {'ADA.ADA': '-826446280'}
+<<<<<<<<<<<<<<< EXTRA SIM EVENT
+Event outbound | {'in_tx_id': 'DC6CDEBB4CAB2B8C257AB288326F85B7F8133796AEADC28FE30D14B460D749FD'} {'id': 'TODO'} {'chain': 'MAYA'} {'from': 'tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6'} {'to': 'tmaya1z63f3mzwv3g75az80xwmhrawdqcjpaekkcgpz9'} {'coin': '6264462809 MAYA.CACAO'} {'memo': 'OUT:DC6CDEBB4CAB2B8C257AB288326F85B7F8133796AEADC28FE30D14B460D749FD'}
+<<<<<<<<<<<<<<< EXTRA SIM EVENT
+Event scheduled_outbound | {'chain': 'ADA'} {'to_address': 'addr_test1vq07qc6nexr9uetwenuuqna8nq6ukftmyljntnn3zw5x69geav0we'} {'vault_pub_key': 'tmayapub1addwnpepqwyvauw5sxu0346q2nzkqt4v7hkvtf35f2urd8mdhe7wkxp08lgvkzy30pa'} {'coin_asset': 'ADA.ADA'} {'coin_amount': '10767000'} {'coin_decimals': '0'} {'memo': 'OUT:DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F'} {'gas_rate': '233000'} {'in_hash': 'DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F'} {'out_hash': ''} {'module_name': ''} {'max_gas_asset_0': 'ADA.ADA'} {'max_gas_amount_0': '233000'} {'max_gas_decimals_0': '0'}
+E[2025-04-08 00:08:12,704] Events mismatch
+
+E[2025-04-08 00:08:12,719] Bad chain Cardano balance: PROVIDER-1 simulated: 40,000.565766 ADA.ADA, mock: 39,999.793214 ADA.ADA
+E[2025-04-08 00:08:12,724] Bad chain Cardano balance: VAULT simulated: 0.089020 ADA.ADA, mock: 0.850000 ADA.ADA
+I[2025-04-08 00:08:12,733] [+] 8.8909090911 MAYA.CACAO | Fee 0.2000000000 MAYA.CACAO | Gas 0.2000000000 MAYA.CACAO
+I[2025-04-08 00:08:12,733] [+] 10.740859 ADA.ADA | Fee 0.000000 ADA.ADA | Gas 0.170121 ADA.ADA
+```
+
+Maybe I'll work on each event in turn.  
+
+So annoying the attrs are individual json objects, why not group them so I can
+just auto format them?  
+
+Cummon claude give me something to sort that shit:
+
+```
+pbpaste | tr '{' '\n' | tr '}' ' ' | awk -F: '/^[ ]*\047/{gsub(/\047/,"",$1); printf "  %-25s %s\n", $1, substr($0, index($0,":")+1)}' | pbcopy
+pbpaste | sed 's/{//g; s/}//g' | awk -F: '{gsub(/\047/,"",$2); gsub(/^[ \t]+|[ \t]+$/,"",$2); printf "  %-25s %s\n", $1, $2}' | pbcopy
+pbpaste | sed -E "s/[{}]//g; s/' '/\n/g" | awk -F: '{gsub(/^ +| +$/,"",$0); gsub(/\047/,"",$0); split($0,a,": "); if(NF>0) printf "  %-25s %s\n", a[1], a[2]}' | pbcopy
+pbpaste | sed -E "s/[{}]//g; s/' '/\n/g" | awk -F: '{gsub(/^ +| +$/,"",$0); gsub(/\047/,"",$0); split($0,a,": "); if(NF>0) printf "%-25s %s\n", a[1], a[2]}' | pbcopy
+```
+
+4th time's the charm:
+
+```
+MISSING / MOCKNET
+pool                      ADA.ADA
+liquidity_provider_units  100000000000
+basis_points              10000
+asymmetry                 0.000000000000000000
+emit_asset                10767000
+emit_cacao                90909090911
+imp_loss_protection       0
+id                        DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F
+chain                     MAYA
+from                      tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw
+to                        tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6
+coin                      1 MAYA.CACAO
+memo                      WITHDRAW:ADA.ADA:10000
+
+EXTRA / SIM
+pool                      ADA.ADA
+liquidity_provider_units  100000000000
+basis_points              10000
+asymmetry                 0.000000000000000000
+emit_asset                10740859
+emit_cacao                90909090911
+imp_loss_protection       0
+id                        DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F
+chain                     MAYA
+from                      tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw
+to                        tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6
+coin                      1 MAYA.CACAO
+memo                      WITHDRAW:ADA.ADA:10000
+```
+
+```
+MISSING -> MOCKNET
+EXTRA   -> SIMULATION
+```
+
+The `emit_asset` is slightly different, and that is all.  
+Right so `10767000` is correct.  
+
+I'm not convinced we're even using the events json any more. Those values are
+way off the sim vals.
+
+Triggered by `MayachainState.handle_withdraw`.  
+
+```
+--------------------------------------------------
+#!# balance: 11000000
+#!# intendedSendAmount: 10767000
+#!# intendedSendAmount (sub estimated fee): 10467000
+#!# changeAmountEstimated: 533000
+WRN change amount is less than utxo, subtracting an additional 617000 fee from
+send amount to ensure change is at least min utxo threshold
+#!# changeToMinUtxoDiff 617000
+#!# intendedSendAmount (updated): 9850000
+#!# calculatedFee: 181693
+#!# redeemAmountWithFee: 9968307
+#!# changeAmountCalculated: bad
+--------------------------------------------------
+10767000 - 300000 = 10467000 (estimated send)
+11000000 - 10467000 = 533000 (change)
+850000 - 533000 + 300000 = 617000 (change diff to min utxo)
+10467000 - 617000 = 9850000 (send minus fee and utxo min)
+9850000 + 300000 - 181693 = 9968307 (send with fee corrected)
+11000000 - 9968307 - 181693 = 850000 (change amount)
+
+617000 + 533000 = 1.150000
+
+10767000 + 300000 - 181693 = 9735307
+11000000 - 181693 - 850000 = 9968307
+```
+
+```
+I[2025-04-08 01:29:58,389]  5 PROVIDER-1 => VAULT      [WITHDRAW:ADA.ADA:10000] 0.0000000001 MAYA.CACAO
+#!# @transfer tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw => tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6 [WITHDRAW:ADA.ADA:10000] 0.0000000001 MAYA.CACAO | Gas 0.2000000000 MAYA.CACAO | ID DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F
+#!# --> gas set, using that value
+#!# --> [<Coin 0.2000000000 MAYA.CACAO>]
+#!# @sim_catch_up
+#!# @sim_trigger_tx
+#!# @get_gas | ADA | tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw => tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6 [WITHDRAW:ADA.ADA:10000] 0.0000000001 MAYA.CACAO | Gas 0.2000000000 MAYA.CACAO | ID DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F
+#!# @_calculate_gas WITHDRAW:ADA.ADA:10000
+{'id': 'DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F', 'chain': 'MAYA', 'from_address': 'tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw', 'to_address': 'tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6', 'memo': 'WITHDRAW:ADA.ADA:10000', 'coins': [<Coin 0.0000000001 MAYA.CACAO>], 'gas': [<Coin 0.2000000000 MAYA.CACAO>], 'max_gas': None, 'fee': None}
+#!# handle_withdraw 0.170121 ADA.ADA
+#!# @get_gas | MAYA | tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw => tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6 [WITHDRAW:ADA.ADA:10000] 0.0000000001 MAYA.CACAO | Gas 0.2000000000 MAYA.CACAO | ID DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F
+#!# --> tx.fee 0.000000 ADA.ADA
+#!# @transfer tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6 => tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw [OUT:DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F] 8.8909090911 MAYA.CACAO | Gas 0.2000000000 MAYA.CACAO | Fee 0.2000000000 MAYA.CACAO
+#!# --> gas set, using that value
+#!# --> [<Coin 0.2000000000 MAYA.CACAO>]
+#!# @transfer addr_test1vrejajc3dvfw46evy7c2tpvf6nl047x84dmu94e8g3ajxdsdu22an => addr_test1vq07qc6nexr9uetwenuuqna8nq6ukftmyljntnn3zw5x69geav0we [OUT:DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F] 10.740859 ADA.ADA | Gas 0.170121 ADA.ADA | Fee 0.000000 ADA.ADA
+#!# --> gas set, using that value
+#!# --> [<Coin 0.170121 ADA.ADA>]
+```
+
+It's calling calculate_gas, chain set to ADA in get_gas, but the tx has `'chain': 'MAYA'`.  
+The addresses are maya addresses.  
+
+Right that's it, I've had it. Going to try and step debug these smokes within
+the container...
+
+```
+pip install debugpy
+pip install -r requirements.txt
+
+python -m scripts.smoke --fast-fail=True
+
+pip install debugpy -t /tmp
+python /tmp/debugpy --wait-for-client --listen 0.0.0.0:5678 -m scripts.smoke
+
+python -m scripts.smoke 
+```
+
+Docker osx doesn't work with network:host because of the way it uses an
+underlying linux vm. So I have to NOT use that and just bind to
+`host.docker.internal`.
+
+```
+OUT:DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F
+OUT:
+10767000 - 10740859 = 26141
+```
+
+emit_asset - is what the withdraw event should be set to  
+outbound_asset_amt - what the actual tx will be set to  
+dynamic_fee - for the last withdrawal, we reserve the "max gas" in the pool  
+
+```
+11000000 - 181693 - 850000 = 10818307
+9968307
+```
+
+I was hoping my calculate fee endpoint would provide what the smoke tests need,
+but unfortunately we're trying to estimate the fee in the smoke sim before we
+even know the from/to addresses or amounts to send. As 200 and 200000 doesn't
+fill the same number of bytes with cbor compression, I can't accurately
+calculate the size at that point. It means I have to do what we've done with
+eth and just hardcode known fees for certain memo transactions. Makes the tests
+brittle, but hey they're up for demolition so let's just get them passing.
+
+Not sure how emit_asset is calculated.
+
+```
+pool before withdraw balance RUNE=90909090911 balance asset=11000000 pool units=100000000000
+liquidity provider before withdraw liquidity provider unit=100000000000
+imp loss calculation deposit value=182644628100 protection=0 redeem value=181818181822
+client withdraw RUNE=90909090911 asset=10767000 units left=0
+pool after withdraw balance RUNE=0 balance asset=233000 pool unit=0
+```
+
+Those are the logs, coming from `withdraw_current.go`.  
+`calculateWithdrawV91`  
+
+100000000000 units
+
+`maxGas, err = mgr.GasMgr().GetMaxGas(ctx, pool.Asset.GetChain())`  
+> 233000
+
+```
+259141 (calculated using fee of 172761)
+172761 * 1.5
+```
+
+That 172761 seemingly comes from `estimated_txn_fee` in the py client.
+
+```
+155333 * 1.5 = 232999.5
+155334 * 1.5 = 233001
+```
+
+That's funny. In python we're truncating. In go we're rounding. So whatever
+I set the estimated fee to it's going to be out by 1. I need to change that in
+python to match go, 🤞 it doesn't break the other smokes.
+
+That max gas is calculated using `tx size * tx fee rate * 1.5` in `GetMaxGas`
+`manager_gas_*.go`.
+
+For ADA the max tx fee is 2.17 (as per the docs. 
+
+Continue with these calculations tomorrow. Need to make sure send/fee/change is
+set correctly on both...
+
+#### 08.04.2025 Tuedsay 6h
+
+```
+--------------------------------------------------
+#!# balance: 11000000
+#!# intendedSendAmount: 10767000
+#!# intendedSendAmount (sub estimated fee): 10467000
+#!# changeAmountEstimated: 533000
+3:07PM WRN bifrost/pkg/chainclients/cardano/client.go:391 > change amount is less than utxo, subtracting an additional 317000 fee from send amount to ensure change is at least min utxo threshold module=cardano service=bifrost
+#!# changeToMinUtxoDiff 317000
+#!# intendedSendAmount (updated): 10450000
+```
+
+```
+--------------------------------------------------
+#!# balance: 11000000
+#!# intendedSendAmount: 10767000
+#!# intendedSendAmount (sub estimated fee): 10467000
+#!# changeAmountEstimated: 533000
+3:15PM WRN bifrost/pkg/chainclients/cardano/client.go:391 > change amount is less than utxo, subtracting an additional 317000 fee from send amount to ensure change is at least min utxo threshold module=cardano service=bifrost
+#!# changeToMinUtxoDiff 317000
+#!# intendedSendAmount (updated): 9850000
+#!# calculatedFee: 181693
+#!# redeemAmountWithFee: 9968307
+#!# changeAmountCalculated: 850000
+--------------------------------------------------
+```
+
+better.
+
+```
+>>>>>>>>>>>>>>> MISSING / MOCKNET SIM EVENT
+Event scheduled_outbound
+chain                     ADA
+to_address                addr_test1vq07qc6nexr9uetwenuuqna8nq6ukftmyljntnn3zw5x69geav0we
+vault_pub_key             tmayapub1zcjduepqn6t874frq948nwk2l0e7tnzeucpy9zx3d8hhpxw5mtzvcwnhmmmq6h4qg9
+coin_asset                ADA.ADA
+coin_amount               10767000
+coin_decimals             0
+memo                      OUT:DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F
+gas_rate                  233000
+in_hash                   DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F
+out_hash                  
+module_name               
+max_gas_asset_0           ADA.ADA
+max_gas_amount_0          233000
+max_gas_decimals_0        0
+
+<<<<<<<<<<<<<<< EXTRA / SIM EVENT
+Event scheduled_outbound 
+chain                     ADA
+to_address                addr_test1vq07qc6nexr9uetwenuuqna8nq6ukftmyljntnn3zw5x69geav0we
+vault_pub_key             tmayapub1addwnpepqv4qfmayw6avfwnddpun9k6yeaejd5wmh3e4qsy4mmehdc64ncmdzx3amah
+coin_asset                ADA.ADA
+coin_amount               10767000
+coin_decimals             0
+memo                      OUT:DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F
+gas_rate                  233000
+in_hash                   DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F
+out_hash                  
+module_name               
+max_gas_asset_0           ADA.ADA
+max_gas_amount_0          233000
+max_gas_decimals_0        0
+
+>>>>>>>>>>>>>>> MISSING / MOCKNET SIM EVENT
+Event security
+msg                       missing tx out in=DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F
+id                        0461F0AE9EF2A16C9E805116E4548DEDE9AB4A5C155121C9EF9F1C6A4291B9C6
+chain                     ADA
+from                      addr_test1vraz0lq93962cft90ehf0tga77qt8gv78vfnvc9ztt9k5kssan46m
+to                        addr_test1vq07qc6nexr9uetwenuuqna8nq6ukftmyljntnn3zw5x69geav0we
+coin                      9968307 ADA.ADA
+memo                      OUT:DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F
+
+<<<<<<<<<<<<<<< EXTRA / SIM EVENT
+Event rewards
+bond_reward               661157024
+ADA.ADA                   -826446280
+
+E[2025-04-08 22:16:15,780] Events mismatch
+```
+
+I can't find any mention of `security` in the smoke tests except in the proto.  
+That pubkey is wrong. It's the ecdsa not eddsa vault key.  
+
+Need to update `generate_scheduled_outbound_events`.  
+`MayachainState` needs eddsa.  
+
+> unsupported operand type(s) for -: 'int' and 'Coin'
+
+Added `MayachainState.get_vault_pubkey_for_chain` 
+
+```
+>>>>>>>>>>>>>>> MISSING SIM EVENT
+Event set_mimir | {'key': 'SOLVENCYHALTADACHAIN'} {'value': '0'}
+>>>>>>>>>>>>>>> MISSING SIM EVENT
+Event set_mimir | {'key': 'SOLVENCYHALTADACHAIN'} {'value': '41'}
+<<<<<<<<<<<<<<< EXTRA SIM EVENT
+Event outbound 
+in_tx_id                  5678B49AAAEFA5B81C11B1154628EFEDF540AAED22A29EFCB146E66236B818FB
+id                        TODO
+chain                     MAYA
+from                      tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6
+to                        tmaya1z63f3mzwv3g75az80xwmhrawdqcjpaekkcgpz9
+coin                      6264462809 MAYA.CACAO
+memo                      OUT:5678B49AAAEFA5B81C11B1154628EFEDF540AAED22A29EFCB146E66236B818FB
+<<<<<<<<<<<<<<< EXTRA SIM EVENT
+Event rewards | {'bond_reward': '661157024'} {'ADA.ADA': '-826446280'}
+E[2025-04-08 23:05:02,781] Events mismatch
+E[2025-04-08 23:05:02,782] failed to send all outbound transactions 1
+>>>>>>>>>>>>>>> MISSING SIM EVENT
+Event set_mimir | {'key': 'SOLVENCYHALTADACHAIN'} {'value': '0'}
+>>>>>>>>>>>>>>> MISSING SIM EVENT
+Event set_mimir | {'key': 'SOLVENCYHALTADACHAIN'} {'value': '41'}
+<<<<<<<<<<<<<<< EXTRA SIM EVENT
+Event outbound
+in_tx_id                  5678B49AAAEFA5B81C11B1154628EFEDF540AAED22A29EFCB146E66236B818FB
+id                        TODO
+chain                     MAYA
+from                      tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6
+to                        tmaya1z63f3mzwv3g75az80xwmhrawdqcjpaekkcgpz9
+coin                      6264462809 MAYA.CACAO
+memo                      OUT:5678B49AAAEFA5B81C11B1154628EFEDF540AAED22A29EFCB146E66236B818FB
+<<<<<<<<<<<<<<< EXTRA SIM EVENT
+Event rewards | {'bond_reward': '661157024'} {'ADA.ADA': '-826446280'}
+```
+
+It looks like `security` is actually an issue.  
+Still an outbound in the queue: `http://localhost:1317/mayachain/queue`  
+Outbound queue: `http://localhost:1317/mayachain/queue/outbound`  
+
+```
+[
+  {
+    "chain": "ADA",
+    "to_address": "addr_test1vq07qc6nexr9uetwenuuqna8nq6ukftmyljntnn3zw5x69geav0we",
+    "vault_pub_key": "tmayapub1zcjduepqxdcdlh23swqxnyfrh0dakrvgda9rdgx7268vgezm86te7yspvgusdjhqff",
+    "coin": {
+      "asset": "ADA.ADA",
+      "amount": "10767000"
+    },
+    "memo": "OUT:DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F",
+    "max_gas": [
+      {
+        "asset": "ADA.ADA",
+        "amount": "233000"
+      }
+    ],
+    "gas_rate": 233000,
+    "in_hash": "DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F",
+    "height": 36
+  }
+]
+```
+
+Is the maya `scheduled_outbound` event fired off before `SignTx`?
+
+Yes we see all of these before SignTx:
+
+```
+type: scheduled_outbound
+attributes:
+  out_hash
+  max_gas_asset_0      ADA.ADA
+  to_address           addr_test1vq07qc6nexr9uetwenuuqna8nq6ukftmyljntnn3zw5x69geav0we
+  coin_asset           ADA.ADA
+  in_hash              DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F
+  gas_rate             233000
+  module_name
+  coin_amount          10767000
+  memo                 OUT:DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F
+  max_gas_amount_0     233000
+  max_gas_decimals_0   0
+  chain                ADA
+  vault_pub_key        tmayapub1zcjduepqkvpmv25hrpu7v42gf38nrqxaxpuuhlgser2fz26ua8u8mqa9mxmqgsq85t
+  coin_decimals        0
+
+type: fee
+attributes:
+  tx_id                DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F
+  coins                2000000000 MAYA.CACAO
+  pool_deduct          0
+
+type: outbound
+attributes:
+  in_tx_id             DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F
+  id                   0000000000000000000000000000000000000000000000000000000000000000
+  chain                MAYA
+  from                 tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6
+  to                   tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw
+  coin                 88909090911 MAYA.CACAO
+  memo                 OUT:DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F
+```
+
+> slash node account, no matched tx out item
+
+Right, it's time I fixed this.  
+My cardano `BroadcastTx` seems to be missing blockmeta and signercache logic.  
+
+`tx.Tx.Coins` 9968307  
+`txOutItem.Coin` 10767000  
+
+That `txOutItem` in `CommonOutboundTxHandler.handleV96(...)` is out. It's just
+taking the full amount and subtracting max_gas, which is an over simplification
+of the cardano fee/change situation.
+
+I could do something like this:
+
+```go
+if chain.Equals(common.ADAChain) {
+  fee := 300_000
+  changeMinUtxo := 850_000
+  amount = cosmos.NewUint(uint64(fee + changeMinUtxo))
+}
+```
+
+Completely rewrote the way we build cardano transactions. We used to call
+`/tx/build` twice, once without fee, again using the returned fee. That would
+ensure the lowest fee, but meant more rpc commands. The real kicker was that
+while that cli rpc would auto calculate the fee, it wouldn't auto deduct it
+from the amount you want to send, so if you didn't estimate enough fee, it
+would complain. It then meant we had to over estimate the fee, then add that
+back to the amount before subtracting the real fee. That really made maters
+worse when you consider the change amount min utxo threshold and making this
+work on the smoke tests (which don't have access to the same info) Now we don't
+use the cardano cli/rpc for building txs and just set our own outputs directly
+before submitting/broadcasting, like with the dash client.
+
+I'll see to: `error calculating rewards`  eventually...
+
+The `update network fee` is just repeatedly set to the static value, so that's
+not good.
+
+```
+static fee * gas rate overhead = gas rate (but not rounded?)
+155381 * 1.5 = 233072
+```
+
+```
+--------------------------------------------------
+#!# amount: 9850000
+#!# amount adjusted: 9850000
+#!# fee: 233000
+#!# change: 917000
+--------------------------------------------------
+```
+
+Where's the `72` going? Where's this rounding happening and why to that amount?
+
+Right now, I have but one smoke issue:
+
+```
+Bad chain Cardano balance: VAULT simulated: 0.968307 ADA.ADA, mock: 0.917000 ADA.ADA
+```
+
+That's not counting the fact I've made some changes to the fee calculations that
+are probably unwise.
+
+```
+0.968307 - 0.917000 = 0.051307
+```
+
+1. the withdraw asset always has max gas subtracted before txsend
+2. `cosmos.RoundToDecimal` is right proper funky and threw me off
+   ```
+   cosmos.RoundToDecimal(cosmos.NewUint(233072), 6)
+   // returns: 233000
+   ```
+3. `GetGasRate` and `GetMaxGas` are both critical in calculating the withdraw amt
+
+
+```
+11000000 - 300000 - 850000 = 9850000
+9850000 - 23300 = 9826700
+```
+
+I'll get this tomorrow.
+
+#### 09.04.2025 Wednesday 5h
+
+Yep, that's it. Clean smoke. With deposit and withdrawal only.
+
+Adding a swap broke it.
+
+---
+
+First I need to have a think about this maxGas / dynamic_fee scenario.
+
+In dash, the `getDASHPaymentAmount` called by `buildTx` will add the fee to the
+send amount when determining the utxos.
+
+The expected fee should have already been deducted from the send amount before
+sign/build is called, so adding the fee back to calculate the utxos makes sense.
+
+---
+
+I had to lift the `tx output >= 2` filter on fetch ada txs because we can send a
+tx with just 1 output with 0 change, as the aux data doesn't require an output.
+That was just copied from other chain clients.
+
+---
+
+Another section that I don't quite get:
+
+We always set the max gas more than the estimated/likely gas.
+
+```go
+if gasAmtSats < maxGasCoin.Amount.Uint64() {
+  // if the tx spend less gas then the estimated MaxGas , then the extra can be added to the coinToCustomer
+  gap := maxGasCoin.Amount.Uint64() - gasAmtSats
+  c.logger.Info().Msgf("max gas is: %s, however only: %d is required, gap: %d goes to customer", tx.MaxGas, gasAmtSats, gap)
+  coinToCustomer.Amount = coinToCustomer.Amount.Add(cosmos.NewUint(gap))
+}
+```
+
+So the if expression will always evaluate to true, which means the customer
+always gets the difference between the estimated and max gas. So can you just
+span deposit/withdraw and suck dash out of the system?
+
+---
+
+I don't understand this:
+
+```go
+if item.Amount < minUTXOAmt && !isSelfTx && !isYggdrasil {
+  continue
+}
+```
+
+Why do we care about dust threshold for inputs? So long as the combined inputs
+are greater than the dust threshold on the output - which they always will be -
+the tx is valid, so why filter them out? Is it a measure to reduce signing
+pressure?
+
+I don't think that's an issue for cardano because we sign the hash of the tx,
+not every input?
+
+---
+
+What do we do when the output of a swap would be less than the min utxo thresh?
+
+---
+
+I keep seeing `vault with pubkey() doesn't exist: vault not found` and it's
+stressing me out.
+
+Also `error calculating rewards`, very scary.
+
+---
+
+c.temporalStorage.UpsertTransactionFee
+
+---
+
+Converting calculations in cardano/client to big.Int to ensure we don't overflow
+uint.
+
+Running without smoke_test_events or smoke_test_balances just to confirm they
+are a massive red herring, and not at all used.  
+Yep, completely clean run setting both to `[]`.
+
+Next baby steps:
+
+- [x] add swap ada -> cacao
+- [ ] add swap cacao -> ada
+- [ ] add partial withdrawal
+- [ ] add dash
+
+```ERR bifrost/signer/sign.go:676 > fail to broadcast tx to chain
+error="\ncardano-cli: DecoderFailure (LocalTxSubmission (GenTx (HardForkBlock
+(': * ByronBlock (': * (ShelleyBlock (TPraos StandardCrypto)
+(ShelleyEra StandardCrypto)) (': * (ShelleyBlock (TPraos StandardCrypto)
+(AllegraEra StandardCrypto)) (': * (ShelleyBlock (TPraos StandardCrypto)
+(MaryEra StandardCrypto)) (': * (ShelleyBlock (TPraos StandardCrypto)
+(AlonzoEra StandardCrypto)) (': * (ShelleyBlock (Praos StandardCrypto)
+(BabbageEra StandardCrypto)) (': * (ShelleyBlock (Praos StandardCrypto)
+(ConwayEra StandardCrypto)) ('[] *)))))))))) (HardForkApplyTxErr
+(': * ByronBlock (': * (ShelleyBlock (TPraos StandardCrypto)
+(ShelleyEra StandardCrypto)) (': * (ShelleyBlock (TPraos StandardCrypto)
+(AllegraEra StandardCrypto)) (': * (ShelleyBlock (TPraos StandardCrypto)
+(MaryEra StandardCrypto)) (': * (ShelleyBlock (TPraos StandardCrypto)
+(AlonzoEra StandardCrypto)) (': * (ShelleyBlock (Praos StandardCrypto)
+(BabbageEra StandardCrypto)) (': * (ShelleyBlock (Praos StandardCrypto)
+(ConwayEra StandardCrypto)) ('[] *)))))))))) ServerAgency TokBusy)
+(DeserialiseFailure 17 \"MaryValue: expected array or int, got TypeInteger\"):
+node command failed"
+memo=OUT:DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F
+module=signer service=bifrost
+```
+
+> expected array or int, got TypeInteger
+
+This error can occur when you send a value outside of the normal signed integer
+range.
+
+#### 17.04.2025 Thursday 7h
+
+Am I currently sitting with a clean smoke run?
+
+No:
+
+> no amount can be deducted from send amount to ensure change amount is greater than utxo threshold
+
+The problem is we are expecting a dust change amount, which cardano doesn't allow.  
+
+We try to make up the change to the min with some of the send amount, but then
+the send amount falls under the dust threshold.
+
+I've changed it so if subtracting the minutxo would cause the send amount to fall
+below the dust threshold, we just send all the dust to the customer along with
+the send amount.
+
+In this case though I'm actually trying to swap to ada by sending ada?
+
+```json
+{
+  "chain": "ADA",
+  "from_address": "USER-1",
+  "to_address": "VAULT",
+  "memo": "SWAP:ADA.ADA:USER-1",
+  "coins": [
+    {
+      "asset": "MAYA.CACAO",
+      "amount": 1000000
+    }
+  ],
+  "gas": null
+}
+```
+
+The chain should be MAYA for that, but this is a good test I'll get the refund
+working first.
+
+Ahh it just wont work. I'm trying to swap 1 ADA, which is 0.62 USD at the time
+of writing. If the swap message is invalid, it will try to refund, but the min
+utxo is 850_000 and the fee is around 200_000, so the refund will not meet the
+threshold. So what happens then? I suppose in general we have the pool depth
+for this to never be an issue. With the option to halt the chain if we get near
+this situation. Too edge case to worry, moving on.
+
+> out coins not matching 1562382 ADA.ADA != 1562286 ADA.ADA
+
+- [x] add swap ada -> cacao
+- [ ] add swap cacao -> ada
+- [ ] add partial withdrawal
+- [ ] add dash
+
+1562382 - 1562286
+
+```
+ACTUAL
+in_tx_id                  7D3BCDFC59F38C10230D1B8AAF2580F80BCCE4D9A65E35681EAAC880213CE584
+id                        45B2F627A5C297097B832AE304975CC561D5A6D8F18E5490878E360517791E42
+chain                     ADA
+from                      addr_test1vrmc2p4w40f90m0yv0m2tx9vyrav5q0vpqyeec4s8j7mx4csdsz43
+to                        addr_test1vrsymch3jrmcaslxu23hg8jdahw5wgyrkeandk56gyv2nhsadex87
+coin                      1562286 ADA.ADA
+memo                      OUT:7D3BCDFC59F38C10230D1B8AAF2580F80BCCE4D9A65E35681EAAC880213CE584
+
+SIM
+in_tx_id                  ED990237D2F9C95542C721BCFCF5CF311050A4A9066EAEADD4705684B4D66C30
+id                        TODO
+chain                     MAYA
+from                      tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6
+to                        tmaya1z63f3mzwv3g75az80xwmhrawdqcjpaekkcgpz9
+coin                      11888888888 MAYA.CACAO
+memo                      OUT:ED990237D2F9C95542C721BCFCF5CF311050A4A9066EAEADD4705684B4D66C30
+```
+
+```
+11 888 888 888
+     1 562 286
+```
+
+So the py sim was expecting us to send the entire vault utxo?? What??? I don't
+even know where to begin with that. Time to break out the step debugger.
+
+Hang on a minute, there should only be 10 ada in the vault??
+
+```python
+# The amount going into the swap
+x = coin.amount
+
+# X = pool cacao balance
+# Y = pool asset balance
+emit = self._calc_asset_emission(X, x, Y)
+```
+
+Spoke with itzamna about cardano txs having to balance with explicit
+fee/outs/change matching the sum of the inputs. If we want to keep amount/gas
+static, we might have to add another utxo to increase the change amount over
+the threshold.
+
+Attempt to build the tx with amount+fee and retry if the change is less than the threshold
+
+We discussed doing the first one, but if we're always adding a utxo to increase
+the change amount over the threshold, we may as well always assume there's going
+to be a change amount and select that by default with the utxos, right?
+
+Now I'm getting a mismatched `fee` event.  
+`NewEventFee` is only called in `manager_txout_*`.  
+
+```json
+{
+  "chain": "MAYA",
+  "from_address": "USER-1",
+  "to_address": "VAULT",
+  "memo": "SWAP:ADA.ADA:USER-1",
+  "coins": [
+    {
+      "asset": "MAYA.CACAO",
+      "amount": 20000000000
+    }
+  ],
+  "gas": null
+}
+```
+
+0.310666
+
+out coins not matching 1078223 ADA.ADA != 1078126 ADA.ADA
+
+```
+155333 - 155381 = -48
+
+(155333*1.5) - (155381 * 1.5) = -72
+233000       - 233072         = -72
+
+1078223 - 1078126 = 97
+
+asset_fee 310666
+coins     310762
+310762 - 310666 = 96
+```
+
+Maybe my python no longer selecting txs the same as go, rewrote `transfer(...)`  
+Nope.  
+Got it.  
+
+```
+multiplier_bps  20000
+net_fee         155333
+asset_fee       310666
+  
+multiplier_bps  20000
+net_fee         155381
+asset_fee       310762
+```
+
+I think it all has to do with that funky cosmos rounding function, which rounds
+to 3 significant figures for ada. Probably need to recreate that nonsense in
+python:
+
+That's the difference, now where are these actually being calculated??
+
+I now have both fee and gas correct, but the amount is out by the 72 above.
+
+That difference comes from the cosmos rounding function in max_gas vs no cosmos
+rounding in python in `handle_fee`.
+
+DAMN SO CLOSE look at these withdraw events tomorrow...
+
+```
+Event withdraw | {'pool': 'ADA.ADA'} {'liquidity_provider_units': '100000000000'} {'basis_points': '10000'} {'asymmetry': '0.000000000000000000'} {'emit_asset': '8455874'} {'emit_cacao': '115994623742'} {'imp_loss_protection': '0'} {'id': 'DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F'} {'chain': 'MAYA'} {'from': 'tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw'} {'to': 'tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6'} {'coin': '1 MAYA.CACAO'} {'memo': 'WITHDRAW:ADA.ADA:10000'}
+<<<<<<<<<<<<<<< EXTRA SIM EVENT
+Event withdraw | {'pool': 'ADA.ADA'} {'liquidity_provider_units': '100000000000'} {'basis_points': '10000'} {'asymmetry': '0.000000000000000000'} {'emit_asset': '8455802'} {'emit_cacao': '115994623742'} {'imp_loss_protection': '0'} {'id': 'DFA73066415CAF0D4B7225F7B79A2586800244B7E76E56D500D2511FCC48AA9F'} {'chain': 'MAYA'} {'from': 'tmaya1wz78qmrkplrdhy37tw0tnvn0tkm5pqd6z6lxzw'} {'to': 'tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6'} {'coin': '1 MAYA.CACAO'} {'memo': 'WITHDRAW:ADA.ADA:10000'}
+```
+
+#### 24.04.2025 Thursday 6h
+
+So I'm supposed to find the fee rounding issue in the python withdraw section eh?
+
+```
+155333 * 1.5 = 233000 // this is how I botched it in python
+155381 * 1.5 = 233072 // this is the actual ada base fee
+```
+
+```py
+dynamic_fee = round(dynamic_fee / 1e3) * 1e3
+```
+
+Event withdraw  
+`{'emit_asset': '8455874'}`
+
+Event withdraw  
+`{'emit_asset': '8455874.0'}`
+
+Somewhat excruciating, forgot the `int()` conversion, this next run will work.  
+Yeah, clean run.  
+Back to this list:  
+
+- [x] swap ada -> cacao
+- [x] swap cacao -> ada
+- [x] swap ada -> cacao, then cacao -> ada
+- [x] no swaps, just withdraw 50, then 100%
+- [x] swap ada -> cacao, then 100/remaining
+
+- [x] swap ada -> cacao, then withdraw 50/half, then 100/remaining
+
+  Doesn't work.
+
+  ```
+  MISSING SIM EVENT (MOCKNET)
+  Event set_mimir | {'key': 'SOLVENCYHALTADACHAIN'} {'value': '0'}
+
+  MISSING SIM EVENT (MOCKNET)
+  Event set_mimir | {'key': 'SOLVENCYHALTADACHAIN'} {'value': '33'}
+
+  EXTRA SIM EVENT (SIM)
+  Event outbound 
+  in_tx_id                  2468F447839D3632996876F371C506545AD4B672CC5454A2BB109DB470D91EFA
+  id                        TODO
+  chain                     MAYA
+  from                      tmaya1g98cy3n9mmjrpn0sxmn63lztelera37nrn4zh6
+  to                        tmaya1z63f3mzwv3g75az80xwmhrawdqcjpaekkcgpz9
+  coin                      11888888888 MAYA.CACAO
+  memo                      OUT:2468F447839D3632996876F371C506545AD4B672CC5454A2BB109DB470D91EFA
+
+  EXTRA SIM EVENT (SIM)
+  Event rewards
+  {'bond_reward': '2222222221'} {'ADA.ADA': '-2777777777'}
+  ```
+
+  `insolvency detected asgard amount=12000000 asset=ADA.ADA gap=5922238 service=bifrost wallet amount=6077762`
+
+  So the asgard vault expected amount has subtracted the withdraw + gas.  
+  It's still expecting all the deposits.  
+
+  ```
+  12000000 - 5689238 = 6310762
+  6310762 - 233000 = 6077762
+  ```
+
+  Oh that time it just worked, perfectly.  
+  I'll try another.  
+
+  Right. The issue I'm having is that when the vault is considered insolvent,
+  the block scanner halts for a while and txouts/ins are disregarded.
+
+  The cardano rpc reports blocks 6 behind to avoid chain reorgs. Unfortunately,
+  the utxo/account balance just asks the node what the current balance is. We
+  filter out new utxos, but we don't reinclude utxos the node already considers
+  spent, so we can be in a situation with the solvency report where we think a
+  vault should have a higher balance than it actually has because we haven't
+  observed certain tx outs yet, and when we ask the cardano rpc it reports less
+  than that balance because the node returns utxos at the current height. The
+  workaround for this is to just fetch the asgard vaults again after that
+  window and compare that balance. It does mean we have to be very aware of
+  the window, and any changes to it need to be updated in both the cardano rpc
+  and the bifrost client. I don't love it but it seems like a decent tradeoff
+  for avoiding reorgs.
+
+  It also means the solvency check lasts for 6 blocks, rather than 1 block as
+  with the other chains.
+
+  Maybe we need to return `RpcBlockReorgWindow` with the rpc status response. So
+  there's a single source of truth there. Added to todo...
+
+- [x] swap cacao -> ada, then withdraw 50/half, then 100/remaining
+
+Time to merge back into the main `add-cardano-branch`.
+
+- Get rid of `FeeEstimate`
+- Remember the ed25519 command must be run in the .mayanode dir (genesis sh)
+
+```
+go get github.com/alexdcox/cardano-go@v0.1.12
+```
+
+Merging develop again.
+
+```
+gco -b add-cardano-chain-smoke-adadash
+```
+
+New smoke test branch for just ada/dash:
+
+```
+gco add-cardano-chain-localsmoke-adadash
+```
+
+Getting the 33 byte pubkey error:  
+> expected a 32 length ed25519 public key, got 33 bytes
+
+```
+key:  tmayapub1zcjduepqsxk72w74wl6lavu7fag7g5nhhaxl9xc0s3gvv623wywksu8vxfuquyxvtp
+algo: ed25519
+```
+
+Hmm. Oh I was just passing in the secp key. Easy
+
+- [x] swap ada -> dash
+
+  > Exception: Bad Dash balance: USER-1 0.00000000 DASH.DASH != (40.00000000 DASH.DASH +/- 0)
+
+  I wonder if this is still the received/unspendable problem?  
+  Think I just need to give the dash mocknet more time to spin up.  
+
+  Just... gorgeous:
+
+```
+  0     MASTER => PROVIDER-1 [SEED] 400.00000000 DASH.DASH
+  1     MASTER => USER-1     [SEED] 40.00000000 DASH.DASH
+  2     MASTER => PROVIDER-1 [SEED] 40,000.000000 ADA.ADA
+  3     MASTER => USER-1     [SEED] 4,000.000000 ADA.ADA
+  4 PROVIDER-1 => VAULT      [ADD:ADA.ADA:PROVIDER-1] 10.0000000000 MAYA.CACAO
+  5 PROVIDER-1 => VAULT      [ADD:ADA.ADA:PROVIDER-1] 10.000000 ADA.ADA
+  6 PROVIDER-1 => VAULT      [ADD:DASH.DASH:PROVIDER-1] 10.0000000000 MAYA.CACAO
+  7 PROVIDER-1 => VAULT      [ADD:DASH.DASH:PROVIDER-1] 10.00000000 DASH.DASH
+  8     USER-1 => VAULT      [SWAP:DASH.DASH:USER-1] 2.000000 ADA.ADA
+ [+] 1.07075155 DASH.DASH | Fee 0.00007216 DASH.DASH | Gas 0.00002160 DASH.DASH
+```
+
+- [x] swap dash -> ada
+
+  This is the one that caused all the issues on txsign out the last time I got
+  this far...
+
+  > fail to sign tx error="not enough balance to pay customer above utxo min threshold. addr_test1vq5t0r99cdjyt6lmpsf5a6juf0hnfq7e4g0gd0jswymp8zsptu287" module=signer service=bifrost
+
+  I guess that's ok, despite the fees being quite high.  
+  Seems to just be stuck though, no refund, no requeue.  
+  Trying with a 3 DASH payment and then will discuss with the maya team how they
+  want to handle this.  
+
+  Cleeeann.
+
+```
+  0     MASTER => PROVIDER-1 [SEED] 400.00000000 DASH.DASH
+  1     MASTER => USER-1     [SEED] 40.00000000 DASH.DASH
+  2     MASTER => PROVIDER-1 [SEED] 40,000.000000 ADA.ADA
+  3     MASTER => USER-1     [SEED] 4,000.000000 ADA.ADA
+  4 PROVIDER-1 => VAULT      [ADD:ADA.ADA:PROVIDER-1] 10.0000000000 MAYA.CACAO
+  5 PROVIDER-1 => VAULT      [ADD:ADA.ADA:PROVIDER-1] 10.000000 ADA.ADA
+  6 PROVIDER-1 => VAULT      [ADD:DASH.DASH:PROVIDER-1] 10.0000000000 MAYA.CACAO
+  7 PROVIDER-1 => VAULT      [ADD:DASH.DASH:PROVIDER-1] 10.00000000 DASH.DASH
+  8     USER-1 => VAULT      [SWAP:ADA.ADA:USER-1] 3.00000000 DASH.DASH
+ [+] 0.969508 ADA.ADA | Fee 0.310762 ADA.ADA | Gas 0.233000 ADA.ADA
+```
+
+```
+ADA/USD 0.7150
+0.310762 * 0.7150 = 0.22219483 USD
+0.233000 * 0.7150 = 0.166595 USD
+```
+
+Should I run the same test tomorrow after calculating more reasonable ratios?  
+
+As in, use the current 10k USD rate for pool deposits for both ADA / DASH and
+then see how we do?
+
+```
+ADA/USD 0.7150
+DASH/USD 22.27
+
+10000 * 1 / 0.7150 = 13986.01398601
+10000 * 1 / 22.27 = 449.03457566
+```
+
+Yeah maybe if I set 14k ada and 450 dash we'll see more reasonable results here.  
+
+Change of plan, I'll tackle some of the remaining todos and tidy things up. The
+goal is to hand this over before the end of this month.
+
+#### 25.04.2025 Friday 1h
+
+Alright working through the todo list:
+
+- [x] Return `RpcBlockReorgWindow` from cardano client.
+
+- reorgwindow
+- reorganisationwindow
+- blocksuntilconfirm
+- blocksuntilconfirm
+- blockstoconfirm
+- confirmations
+- requiredconfirmations
+- blocksbehindtip
+- trailtipbyblocks
+
+Added a new flag, `--reorgwindow BLOCKS` for the rpc client. "Confirmations"
+would be cleaner but it's not really in the scope of the rpc to say what
+implementing clients should consider confirmed and doesn't really communicate
+whats happening.
+
+Added some very explicit logging to confirm the cli arg:  
+> block processor set to trail node tip by a reorganisation window of 6 blocks
+
+It can be set to 0, but that might cause massive damage and break the internet.
+
+- [-] Add resync flag
+
+Going to skip this in the name of speed because it's trivial to delete the
+database to resync everything, and it's trivial to open up sqllite and run a
+custom query to delete blocks/points after a certain height to achieve the same
+thing as the reconsider block flag many chains have.
+
+- [x] Remove adc settings from default.yaml (or override somehow)
+  `add-cardano-chain` is clean
+
+- [x] Make naming conventions for secp/eddsa/ecdsa consistent
+  Just renamed `GetSECPPubKey` to `GetECDSAPubKey`
+
+- [ ] dont repeatedly send network fee for ada if it hasn't changed
+  How do the other chain clients do this?
+
+#### 26.04.2025 Monday 5h
+
+- [x] Read reorg window in maya from cardano client
+- [x] No repeat network fee
+      Each cardano client sends the fee when it starts up, once.
+- [x] remove dangerous cli rpc endpoint and consider endpoint security
+- [x] Set default cardano image entrypoint to mainnet? It is.
+      Pushed to `node-launcher:cardano-privnet`
+- [x] Run go mod vendor and commit
+- [x] Bugfix: Update block processor highest point after rollback
+- [x] `DetectChainSplit` is currently only logging. removed it
+- [x] Add `InboundNotes` entry for `ADAChain`
+
+Node launcher cardano build is failing
+
+github.com/fxamacker/cbor/v2
+
+```
+docker run \
+  -it \
+  --rm \
+  golang:1.22.11-alpine
+
+mkdir /app && cd /app
+apk add --no-cache git gcc musl-dev
+git clone https://github.com/alexdcox/cardano-go.git .
+git checkout $(git tag -l | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' | sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1)
+CGO_ENABLED=1 CGO_CFLAGS="-D_LARGEFILE64_SOURCE" go build -a -installsuffix cgo ./cmd/rpc
+```
+
+```
+/app # CGO_ENABLED=1 CGO_CFLAGS="-D_LARGEFILE64_SOURCE" go build -a -installsuffix cgo ./cmd/rpc
+block.go:10:2: cannot find module providing package github.com/alexdcox/cbor/v2: import lookup disabled by -mod=vendor
+  (Go version in go.mod is at least 1.14 and vendor directory exists.)
+vendor/github.com/blinklabs-io/gouroboros/ledger/common/address.go:25:2: cannot find module providing package github.com/blinklabs-io/gouroboros/cbor: import lookup disabled by -mod=vendor
+  (Go version in go.mod is at least 1.14 and vendor directory exists.)
+vendor/github.com/blinklabs-io/gouroboros/ledger/verify_block_body.go:27:2: cannot find module providing package github.com/fxamacker/cbor/v2: import lookup disabled by -mod=vendor
+  (Go version in go.mod is at least 1.14 and vendor directory exists.)
+```
+
+Oh I was accidentally excluding some crucial vendor packages with a gitignore
+line to block a symlink to the cbor package. Needs to be `/cbor/` to block top
+level.
+
+> flag provided but not defined: -nodehostport
+
+Had to update the mainnet script to match cardano-rpc changes.
+
+```
+--ntnhostport 0.0.0.0:3000
+--ntchostport 0.0.0.0:3001
+--rpchostport 0.0.0.0:3004
+--network mainnet
+--databasepath cardano-rpc-mainnet.db
+```
+```
+docker run \
+  -it \
+  --name cardano-mainnet-temp \
+  --stop-timeout 60 \
+  --rm \
+  -p 3000:3000 \
+  -p 3001:3001 \
+  registry.gitlab.com/mayachain/devops/node-launcher:cardano-daemon-10.1.4
+
+docker exec cardano-mainnet-temp pkill -f cardano-rpc
+
+docker exec -it cardano-mainnet-temp tail -F -n +1 /var/log/rpc.log
+```
+
+The `/status` endpoint is returning this error from the gouroboros package.
+
+> unknown era ID: 0
+
+Another error in ouroboros.
+
+I'll just omit `protocol` from the status response if we can't fetch it i.e. the
+node is not in a usable state and probably needs to sync.
+
+The `/block/latest` endpoint is returning this:
+
+> json: unsupported type: map[interface {}]interface {}
+
+Fixed.
+
+Getting different height/slot responses compared to cardanoscan.  
+Ah I was checking for `isBoundary` but never actually setting that.
+
+```
+cardano-cli query protocol-parameters --mainnet --socket-path /opt/node.socket --out-file /dev/stdout
+```
+
+> This query cannot be used for the Byron era
+
+Well there's your answer.
+
+Byron blocks don't have a height set, fixed.
+
+Catching up my cardano-rpc with mainnet now.
+
+#### 29.04.2025 Tuesday 6h 30m
+
+Getting an irritating warning logged from the ouroboros package:  
+> WARN unsupported cost model version version=0
+
+Can I turn it off? Yes.
+
+- [x] We're processing 9994 blocks despite being far behind the reorg window
+
+These are the only things remaining on my todo list:
+
+- [x] check cardano-go handles BLOCK NUMBER PRE-CONWAY, where it's not returned with the ouroboros client
+- [ ] remove/implement all TODOS in cardano-go and mayanode (IsChainV112 still has one)
+  - [x] cardano-go
+  - [ ] mayanode
+    - [x] bifrost checkpoint logic
+    - [x] utxo consolidation (refactor for understanding and to double check logic, still needs testing)
+    - [ ] client test
+- [ ] need to review the maya ROLLBACK logic and make sure we have a test in place for this.
+- [ ] cardano CHAIN REORG logic (and smoke test)
+- [ ] add a BIFROST CHAINCLIENT TEST
+- [ ] make sure ALL CARDANO ADDRESS TYPES are accepted
+- [ ] PLUTUS LOCK SCRIPTS (do we need to worry?)
+
+We need a number to identify maya transactions in the aux data.
+
+MP (maya protocol) is `4d 50` in hex.  
+We could do `4050`.  
+maya is `6d 61 79 61`.  
+What if we just take the first hex digit from each letter: `6676`.  
+It's more professional than `1337`, as it currently stands.  
+
+I've called it `MayaProtocolAuxKey`.  
+`maya` in hex is `6d 61 79 61`, so we could use `6676`.  
+Pretty easy one to remember too.  
+Asked Aaluxx and Itz what they'd prefer.  
+
+Checkpoints. What are they?
+
+```
+// SignCheckpoint is used to checkpoint the built transaction before signing, for use in
+// round 7 signing errors which must reuse the same inputs.
+```
+
+What are round 7 signing errors?  
+The final try at a tss signature.  
+
+It looks like they're just avoiding reselecting utxos to avoid double spend,
+and simply trying to sign and broadcast using the same inputs. For cardano, the
+tx submission struct contains all that info so I think we can do away with the
+"individual amounts" struct and just marshal/reuse the whole thing.
+
+Right that's the checkpoint logic done.
+
+I take issue with this:
+> also make sure it will spend at least maxUTXOsToSpend
+
+If it's spending at least the max, the max is actually a min, so why are we
+using the exact opposite of what we mean?
+
+Right we're consolidating inputs that would overflow the max limit, into a
+single output that will not.
+
+I don't trust this consolidate utxos logic. I've refactored to make it a bit
+more of a single readable block - jumping around less to additional functions.
+Especially where the code isn't shared anyway.
+
+Okay my cardano mocknet is now broken for some reason??
+
+> jq: parse error: Invalid numeric literal at line 1, column 7
+
+Huh??
+
+Ah right the entrypoint privnet script is still using the POST /cli endpoint
+which has been removed to avoid leaving a port open to arbitrary commands.
+Updated scripts to use specific /tx/sign endpoint.
+
+Right I'll do a client test, then onto the dreaded reorg and whatever 'maya
+rollback' is.
+
+#### 30.04.2025 Wednesday 1h 20m
+
+Back to the bifrost client test. These are the rpc funcs called, which need to
+be mocked. I'll start with a normal test and then add something for reorgs.
+
+- BroadcastTx 
+- GetBlockByHeight
+- GetHeight
+- GetStatus
+- GetTransaction
+- GetUtxosForAddress
+
+715b98b05551f2e5adb0966a44e3dc99f9b551304132e39895196f21b019097a
+
+#### 05.05.2025 Monday 1h 30m
+
+Bifrost client test (todo list moved to tomorrow)
+
+#### 06.05.2025 Tuesday 3h
+
+Bifrost client test...
+
+- [x] test get status (protocol, reorg window)
+- [x] test get height
+- [x] test get chain
+- [x] test fetch/ignore txs
+  - [x] test get memo
+  - [x] test get gas/fee
+  - [x] test get sender
+
+SWAP:MAYA.CACAO:tmaya1z63f3mzwv3g75az80xwmhrawdqcjpaekkcgpz9
+
+Those tests aren't exactly rigourous, essentially parsing json. Not much
+of an excersise. I need to try a reorg.
+
+For a start, I need to test that it handles a client which hasn't caught up.
+
+The bitcoin bifrost client calls `processReorg` every time we `FetchTxs(...)`.  
+
+#### 07.05.2025 Wednesday 3h 25m
+
+My latest code changes aren't being pulled??
+
+```
+go get github.com/alexdcox/cardano-go@v0.1.18
+go get github.com/alexdcox/cardano-go@800c018
+go get github.com/alexdcox/cardano-go@800c0182baa99ae5614f405ac4c1ae4de28f1805
+go get github.com/alexdcox/cardano-go@latest
+
+go clean -modcache
+
+go mod download github.com/alexdcox/cardano-go@latest
+go mod download github.com/alexdcox/cardano-go@800c0182baa99ae5614f405ac4c1ae4de28f1805
+
+go list -m github.com/alexdcox/cardano-go@800c0182baa99ae5614f405ac4c1ae4de28f1805
+```
+
+```
+https://proxy.golang.org/github.com/alexdcox/cardano-go/@latest
+https://proxy.golang.org/github.com/alexdcox/cardano-go/@v/v0.1.18.info
+```
+
+In the end I just made a commit with `--allow-empty` but that isn't great.
+Surely there's a way to have the proxy.golang recache the version info from
+github so `go get` etc. works with forced commit/tag updates.
+
+As far as I can tell, processReorg for bitcoin simply fetches the new
+transactions. We rely on confirmations to filter out transactions already
+watched from invalid chains. For cardano, we're already trailing 6 blocks
+behind so I think we can just move on.
+
+```
+export VERSION=1.118.0
+export CGO_ENABLED=1
+export CGO_LDFLAGS="-L/Users/adc/go/src/gitlab.com/mayachain/mayanode/lib -lradix_engine_toolkit_uniffi"
+export DYLD_LIBRARY_PATH1=/Users/adc/go/src/gitlab.com/mayachain/mayanode/lib
+
+go test -v --tags mocknet ./bifrost/pkg/chainclients/cardano
+```
+
+
+
+
+
+
 
 
